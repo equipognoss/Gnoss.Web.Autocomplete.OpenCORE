@@ -8,10 +8,10 @@ Configuración estandar de esta aplicación en el archivo docker-compose.yml:
 
 ```yml
 autocomplete:
-    image: autocomplete
+    image: docker.gnoss.com/autocomplete
     env_file: .env
     ports:
-     - ${puerto_autocompletar}:80
+     - ${puerto_autocomplete}:80
     environment:
      virtuosoConnectionString: ${virtuosoConnectionString}
      acid: ${acid}
