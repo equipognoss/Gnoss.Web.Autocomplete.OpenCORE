@@ -8,7 +8,7 @@ Configuración estandar de esta aplicación en el archivo docker-compose.yml:
 
 ```yml
 autocomplete:
-    image: docker.gnoss.com/autocomplete
+    image: gnoss/autocomplete
     env_file: .env
     ports:
      - ${puerto_autocomplete}:80
