@@ -31,7 +31,6 @@ using Es.Riam.Gnoss.Web.MVC.Models.Administracion;
 using Es.Riam.Semantica.OWL;
 using Es.Riam.Util;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -43,6 +42,8 @@ using Microsoft.AspNetCore.Cors;
 using System.Net;
 using Es.Riam.AbstractsOpen;
 using System.IO;
+using Gnoss.Web.Autocomplete;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Gnoss.Web.AutoComplete
 {
@@ -50,7 +51,7 @@ namespace Gnoss.Web.AutoComplete
     [Route("[controller]")]
     [EnableCors("_myAllowSpecificOrigins")]
 
-    public class AutoCompletarController : Controller
+    public class AutoCompletarController : Autocomplete.ControllerBase
     {
         private EntityContext mEntityContext;
         private LoggingService mLoggingService;
@@ -65,6 +66,7 @@ namespace Gnoss.Web.AutoComplete
         private IServicesUtilVirtuosoAndReplication mServicesUtilVirtuosoAndReplication;
 
         public AutoCompletarController(EntityContext entityContext, LoggingService loggingService, ConfigService configService, RedisCacheWrapper redisCacheWrapper, VirtuosoAD virtuosoAD, IHttpContextAccessor httpContextAccessor, GnossCache gnossCache, EntityContextBASE entityContextBASE, IServicesUtilVirtuosoAndReplication servicesUtilVirtuosoAndReplication)
+            : base(loggingService, configService, entityContext, redisCacheWrapper, gnossCache, virtuosoAD, httpContextAccessor, servicesUtilVirtuosoAndReplication)
         {
             mEntityContext = entityContext;
             mLoggingService = loggingService;
