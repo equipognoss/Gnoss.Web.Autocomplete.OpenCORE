@@ -45,42 +45,59 @@ namespace Gnoss.Web.Autocomplete
 
         public override void OnActionExecuting(ActionExecutingContext filterContext)
         {
-            Guid identidadID = Guid.Parse(Request.Form["pIdentidadID"]);
 #if !DEBUG
-            if (!identidadID.Equals(UsuarioAD.Invitado))
+            if (mConfigService.PeticionHttps())
             {
-                try
-                {
-                    Dictionary<string, string> cookie = UtilCookies.FromLegacyCookieString(Request.Cookies["_UsuarioActual"], mEntityContext);
-                    if (cookie != null)
-                    {
 
-                        Guid usuarioID = new Guid(cookie["usuarioID"]);
-                        IdentidadCN identidadCN = new IdentidadCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication);
-                        Guid usuarioIDDeBD = identidadCN.ObtenerUsuarioIDConIdentidadID(identidadID);
-                        if (!usuarioIDDeBD.Equals(usuarioID))
+
+                Guid identidadID = Guid.Parse(Request.Form["identidad"]);
+
+                if (!identidadID.Equals(UsuarioAD.Invitado))
+                {
+                    try
+                    {
+                        Dictionary<string, string> cookie = UtilCookies.FromLegacyCookieString(Request.Cookies["_UsuarioActual"], mEntityContext);
+                        if (cookie != null && cookie.Count != 0)
                         {
-                            filterContext.Result = new UnauthorizedResult();
+
+                            Guid usuarioID = new Guid(cookie["usuarioID"]);
+                            IdentidadCN identidadCN = new IdentidadCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication);
+                            Guid usuarioIDDeBD = identidadCN.ObtenerUsuarioIDConIdentidadID(identidadID);
+                            if (!usuarioIDDeBD.Equals(usuarioID))
+                            {
+                                filterContext.Result = new UnauthorizedResult();
+                            }
+                        }
+                        else
+                        {
+                            string identidadIDCadena = Request.Headers["Authorization"];
+                            if (string.IsNullOrEmpty(identidadIDCadena))
+                            {
+                                filterContext.Result = new UnauthorizedResult();
+                            }
+                            else
+                            {
+                                if(!identidadID.Equals(Guid.Parse(identidadIDCadena.Split("bearer ")[1])))
+                                {
+                                    filterContext.Result = new UnauthorizedResult();
+                                }
+                            }
                         }
                     }
-                    else
+                    catch (InvalidCypherTextException)
+                    {
+                        if (mHttpContextAccessor.HttpContext.Request.Cookies.ContainsKey("_UsuarioActual"))
+                        {
+                            Response.Cookies.Append("_UsuarioActual", Request.Cookies["_UsuarioActual"], new CookieOptions { Expires = new DateTime(2000, 1, 1) });
+                        }
+                        filterContext.Result = new UnauthorizedResult();
+                    }
+                    catch (Exception)
                     {
                         filterContext.Result = new UnauthorizedResult();
                     }
-                }
-                catch (InvalidCypherTextException)
-                {
-                    if (mHttpContextAccessor.HttpContext.Request.Cookies.ContainsKey("_UsuarioActual"))
-                    {
-                        Response.Cookies.Append("_UsuarioActual", Request.Cookies["_UsuarioActual"], new CookieOptions { Expires = new DateTime(2000, 1, 1) });
-                    }
-                    filterContext.Result = new UnauthorizedResult();
-                }
-                catch (Exception)
-                {
-                    filterContext.Result = new UnauthorizedResult();
-                }
 
+                }
             }
 #endif
         }
