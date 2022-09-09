@@ -2,6 +2,8 @@
 
 # Gnoss.Web.Autocomplete.OpenCORE
 
+![](https://github.com/equipognoss/Gnoss.Web.Autocomplete.OpenCORE/workflows/BuildWeb/badge.svg)
+
 Aplicación Web que se encarga de generar las sugerencias de búsqueda de una faceta concreta. Por ejemplo, si en la faceta (o filtro de búsqueda) de país, el usuario empieza a teclear “espa”, esta aplicación le sugiere “España”.
 
 Configuración estandar de esta aplicación en el archivo docker-compose.yml: 
