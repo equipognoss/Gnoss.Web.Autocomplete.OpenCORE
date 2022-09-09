@@ -2697,15 +2697,19 @@ namespace Gnoss.Web.AutoComplete
         [NonAction]
         private string ObtenerPropiedadesOntologia(string q, string lista, string identidad, string organizacion, string proyecto)
         {
-            string[] arrayAnteriores = lista.Split(',');
             List<string> listaAnteriores = new List<string>();
-            //Recorro el array para limpiar los espacios vacios.
-            foreach (string elementoAnt in arrayAnteriores)
+            if (lista != null)
             {
-                string elemento = elementoAnt.Trim();
-                if (elemento != "" && !listaAnteriores.Contains(elemento))
+                string[] arrayAnteriores = lista.Split(',');
+
+                //Recorro el array para limpiar los espacios vacios.
+                foreach (string elementoAnt in arrayAnteriores)
                 {
-                    listaAnteriores.Add(elemento);
+                    string elemento = elementoAnt.Trim();
+                    if (elemento != "" && !listaAnteriores.Contains(elemento))
+                    {
+                        listaAnteriores.Add(elemento);
+                    }
                 }
             }
             Guid organizacionID = Guid.Empty;
