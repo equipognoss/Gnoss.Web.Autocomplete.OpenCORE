@@ -493,7 +493,7 @@ namespace Gnoss.Web.AutoComplete
             ProyectoPestanyaBusqueda filaPestanyaBusqueda = dataWrapperProyecto.ListaProyectoPestanyaBusqueda.FirstOrDefault(proy => proy.PestanyaID.Equals(pPestanyaID));
             ProyectoPestanyaMenu filaPestanya = dataWrapperProyecto.ListaProyectoPestanyaMenu.FirstOrDefault(proy => proy.PestanyaID.Equals(pPestanyaID));
 
-            if (filaPestanyaBusqueda == null && filaPestanya != null && filaPestanya.TipoPestanya.Equals((short)TipoPestanyaMenu.Recursos))
+            if (filaPestanya != null && filaPestanya.TipoPestanya.Equals((short)TipoPestanyaMenu.Recursos))
             {
                 if (!pListaFiltros.ContainsKey("rdf:type"))
                 {
