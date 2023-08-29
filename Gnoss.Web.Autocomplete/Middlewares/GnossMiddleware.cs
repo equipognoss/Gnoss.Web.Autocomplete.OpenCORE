@@ -1,4 +1,5 @@
-﻿using Es.Riam.Gnoss.Util.General;
+﻿using Es.Riam.Gnoss.AD.EntityModel;
+using Es.Riam.Gnoss.Util.General;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Hosting;
@@ -19,8 +20,9 @@ namespace ServicioAutoCompletarMVC
             mEnv = env;
         }
 
-        public async Task Invoke(HttpContext context, LoggingService loggingService)
+        public async Task Invoke(HttpContext context, LoggingService loggingService, EntityContext entityContext)
         {
+            entityContext.SetTrackingFalse();
             Application_BeginRequest(loggingService);
             await _next(context);
             Application_EndRequest(loggingService);
@@ -57,9 +59,8 @@ namespace ServicioAutoCompletarMVC
 
             return ruta;
         }
+    }
 
-        
-        }
     public static class GlobalAsaxExtensions
     {
         public static IApplicationBuilder UseGnossMiddleware(this IApplicationBuilder app)

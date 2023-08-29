@@ -64,8 +64,9 @@ namespace Gnoss.Web.AutoComplete
         private GnossCache mGnossCache;
         private EntityContextBASE mEntityContextBASE;
         private IServicesUtilVirtuosoAndReplication mServicesUtilVirtuosoAndReplication;
+		private static List<string> PropiedadesOntologiasBasicas = new List<string>() { "rdf:type" };
 
-        public AutoCompletarController(EntityContext entityContext, LoggingService loggingService, ConfigService configService, RedisCacheWrapper redisCacheWrapper, VirtuosoAD virtuosoAD, IHttpContextAccessor httpContextAccessor, GnossCache gnossCache, EntityContextBASE entityContextBASE, IServicesUtilVirtuosoAndReplication servicesUtilVirtuosoAndReplication)
+		public AutoCompletarController(EntityContext entityContext, LoggingService loggingService, ConfigService configService, RedisCacheWrapper redisCacheWrapper, VirtuosoAD virtuosoAD, IHttpContextAccessor httpContextAccessor, GnossCache gnossCache, EntityContextBASE entityContextBASE, IServicesUtilVirtuosoAndReplication servicesUtilVirtuosoAndReplication)
             : base(loggingService, configService, entityContext, redisCacheWrapper, gnossCache, virtuosoAD, httpContextAccessor, servicesUtilVirtuosoAndReplication)
         {
             mEntityContext = entityContext;
@@ -727,6 +728,10 @@ namespace Gnoss.Web.AutoComplete
                 if(pExtraWhere == null)
                 {
                     pExtraWhere = "";
+                }
+                if(pIdioma == null)
+                {
+                    pIdioma = "";
                 }
 
                 if (pGrafo.StartsWith("\""))
@@ -1493,12 +1498,12 @@ namespace Gnoss.Web.AutoComplete
         /// <param name="proyecto">ProyectoActual</param>
         /// <param name="bool_edicion">True si es para editores, false para lectores</param>
         /// <returns></returns>
-        [HttpGet]
+        [HttpPost]
         [Route("AutoCompletarLectoresEditoresConUsuarioID")]
-        public IActionResult AutoCompletarLectoresEditoresConUsuarioID(string q, string lista, string identidad, string organizacion, string proyecto, string bool_edicion, string grupo)
+        public IActionResult AutoCompletarLectoresEditoresConUsuarioID([FromForm] AutocompletarLectoresEditoresModel autocompletarLectoresEditoresModel)
         {
             short traerDatos = 3;//Usuarios
-            string respuesta = AutoCompletarLectoresEditoresInt(q, lista, identidad, organizacion, proyecto, bool_edicion, traerDatos, grupo);
+            string respuesta = AutoCompletarLectoresEditoresInt(autocompletarLectoresEditoresModel.q, autocompletarLectoresEditoresModel.lista, autocompletarLectoresEditoresModel.identidad, autocompletarLectoresEditoresModel.organizacion, autocompletarLectoresEditoresModel.proyecto, autocompletarLectoresEditoresModel.bool_edicion, traerDatos, autocompletarLectoresEditoresModel.grupo);
 
             return Ok(respuesta);
         }
@@ -1512,10 +1517,11 @@ namespace Gnoss.Web.AutoComplete
         /// <param name="proyecto">ProyectoActual</param>
         /// <param name="bool_edicion">True si es para editores, false para lectores</param>
         /// <returns></returns>
-        [HttpGet]
+        [HttpPost]
         [Route("AutocompletarMiembrosOrganizacion")]
-        public IActionResult AutocompletarMiembrosOrganizacion(string q, string lista, string identidad, string organizacion, string grupo)
+        public IActionResult AutocompletarMiembrosOrganizacion([FromForm]string q, [FromForm] string lista, [FromForm] string identidad, [FromForm] string organizacion, [FromForm] string grupo)
         {
+            if(lista == null) { lista = ""; }
             string[] arrayAnteriores = lista.Split(',');
             List<string> listaAnteriores = new List<string>();
             //Recorro el array para limpiar los espacios vacios.
@@ -2694,6 +2700,8 @@ namespace Gnoss.Web.AutoComplete
                 return mControladorDocumentacion;
             }
         }
+
+        
         [NonAction]
         private string ObtenerPropiedadesOntologia(string q, string lista, string identidad, string organizacion, string proyecto)
         {
@@ -2769,7 +2777,10 @@ namespace Gnoss.Web.AutoComplete
             {
                 listaFinal = nombresDatatypeProperty.Where(item => item.ToLower().Contains(q)).Union(nombresObjectProperty.Where(item => item.ToLower().Contains(q))).ToList();
             }
-            for (int i = 0; i < listaFinal.Count; i++)
+
+			listaFinal.AddRange(PropiedadesOntologiasBasicas.Where(item => item.ToLower().Contains(q)));
+
+			for (int i = 0; i < listaFinal.Count; i++)
             {
                 resultados += listaFinal[i];
                 resultados += Environment.NewLine;
@@ -2803,6 +2814,17 @@ namespace Gnoss.Web.AutoComplete
         }
 
         #endregion
+    }
+
+    public class AutocompletarLectoresEditoresModel
+    {
+        public string q { get; set; }
+        public string lista { get; set; }
+        public string identidad { get; set; }
+        public string organizacion { get; set; }
+        public string proyecto { get; set; }
+        public string bool_edicion { get; set; }
+        public string grupo { get; set; }
     }
 }
 
