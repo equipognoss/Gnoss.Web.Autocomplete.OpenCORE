@@ -28,6 +28,7 @@ using Es.Riam.Gnoss.AD.Facetado;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Infrastructure;
 using Es.Riam.AbstractsOpen;
 using Es.Riam.OpenReplication;
+using Es.Riam.Gnoss.CL.RelatedVirtuoso;
 
 namespace Gnoss.Web.AutoComplete
 {
@@ -69,6 +70,7 @@ namespace Gnoss.Web.AutoComplete
             services.AddScoped(typeof(Configuracion));
             services.AddScoped(typeof(GnossCache));
             services.AddScoped(typeof(VirtuosoAD));
+            services.AddScoped(typeof(RelatedVirtuosoCL));
             services.AddScoped<IServicesUtilVirtuosoAndReplication, ServicesVirtuosoAndBidirectionalReplicationOpen>();
             string bdType = "";
             IDictionary environmentVariables = Environment.GetEnvironmentVariables();
