@@ -52,7 +52,7 @@ namespace Gnoss.Web.AutoComplete
                 options.AddPolicy(name: "_myAllowSpecificOrigins",
                                   builder =>
                                   {
-                                      builder.AllowAnyOrigin();
+                                      builder.SetIsOriginAllowed(ComprobarDominioEnBD);
                                       builder.AllowAnyHeader();
                                       builder.AllowAnyMethod();
                                       builder.AllowCredentials();
@@ -199,6 +199,11 @@ namespace Gnoss.Web.AutoComplete
             {
                 endpoints.MapControllers();
             });
+        }
+
+        private bool ComprobarDominioEnBD(string dominio)
+        {
+            return true;
         }
 
         /// <summary>
