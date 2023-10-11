@@ -54,6 +54,8 @@ namespace Gnoss.Web.AutoComplete
                                   {
                                       builder.AllowAnyOrigin();
                                       builder.AllowAnyMethod();
+                                      builder.AllowAnyMethod();
+                                      builder.AllowCredentials();
                                   });
             });
 
