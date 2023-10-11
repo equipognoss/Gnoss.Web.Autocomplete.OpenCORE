@@ -53,7 +53,7 @@ namespace Gnoss.Web.AutoComplete
                                   builder =>
                                   {
                                       builder.AllowAnyOrigin();
-                                      builder.AllowAnyMethod();
+                                      builder.AllowAnyHeader();
                                       builder.AllowAnyMethod();
                                       builder.AllowCredentials();
                                   });
