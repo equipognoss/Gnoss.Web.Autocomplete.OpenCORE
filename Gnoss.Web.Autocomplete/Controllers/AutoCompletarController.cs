@@ -44,6 +44,9 @@ using Es.Riam.AbstractsOpen;
 using System.IO;
 using Gnoss.Web.Autocomplete;
 using Microsoft.AspNetCore.Mvc;
+using Es.Riam.Gnoss.AD.EntityModel.Models.UsuarioDS;
+using Es.Riam.Gnoss.AD.Usuarios.Model;
+using Microsoft.Exchange.WebServices.Data;
 
 namespace Gnoss.Web.AutoComplete
 {
@@ -720,7 +723,7 @@ namespace Gnoss.Web.AutoComplete
 
         [HttpPost]
         [Route("AutoCompletarSeleccEntDocSem")]
-        public IActionResult AutoCompletarSeleccEntDocSem([FromForm] string q, [FromForm] string pGrafo, [FromForm] string pEntContenedora, [FromForm] string pPropiedad, [FromForm] string pTipoEntidadSolicitada, [FromForm] string pPropSolicitadas, [FromForm] string pControlID, [FromForm] string pExtraWhere, [FromForm] string pIdioma)
+        public IActionResult AutoCompletarSeleccEntDocSem([FromForm] string q, [FromForm] string pGrafo, [FromForm] string pEntContenedora, [FromForm] string pPropiedad, [FromForm] string pTipoEntidadSolicitada, [FromForm] string pPropSolicitadas, [FromForm] string pControlID, [FromForm] string pExtraWhere, [FromForm] string pIdioma, [FromForm] string pProyectoID, [FromForm] string identidad)
         {
             string resultados = "";
             try
@@ -758,7 +761,7 @@ namespace Gnoss.Web.AutoComplete
                 }
 
                 //Descartamos los borradores:
-                pExtraWhere += $" MINUS {{?s <{GestionOWL.PropBorradorGnossRdf}> ?borrador}}";
+                pExtraWhere += $" OPTIONAL {{?s <{GestionOWL.PropBorradorGnossRdf}> ?borrador}} FILTER(!BOUND(?borrador))";
 
                 #region configuración extra
 
@@ -798,7 +801,7 @@ namespace Gnoss.Web.AutoComplete
                 propsPrimeraConsulta.Add(propSelec[0]);
 
                 FacetadoCN facetadoCN = new FacetadoCN(UrlIntragnoss, pGrafo, mEntityContext, mLoggingService, mConfigService, mVirtuosoAD, mServicesUtilVirtuosoAndReplication);
-                FacetadoDS facetadoDS = facetadoCN.ObtenerRDFXMLSelectorEntidadFormulario(pGrafo, pEntContenedora, pPropiedad, pTipoEntidadSolicitada, propsPrimeraConsulta, q, pExtraWhere, pIdioma);
+                FacetadoDS facetadoDS = facetadoCN.ObtenerRDFXMLSelectorEntidadFormulario(pGrafo, pEntContenedora, pPropiedad, pTipoEntidadSolicitada, propsPrimeraConsulta, q, pExtraWhere, pIdioma, new Guid(identidad), new Guid(pProyectoID));
 
                 #region Propiedades extra a la principal
 
@@ -1002,6 +1005,8 @@ namespace Gnoss.Web.AutoComplete
                 identProyPrivCargados = amigosCL.ObtenerAmigosEIdentidadesEnMisProyectosPrivados(identidadID, idenDSpriv, identidadOrganizacionID == identidadID, false);
             }
 
+            DataWrapperIdentidad idenDWGruposProyectos = identidadCN.ObtenerGruposEnvios(identidadID);
+
             if (identProyPrivCargados || amigosCargados)
             {
                 string busq = UtilCadenas.RemoveAccentsWithRegEx(q);
@@ -1148,12 +1153,7 @@ namespace Gnoss.Web.AutoComplete
 
             listaNombres = resultadosPerfil.Distinct().ToArray();
 
-            #region GRUPOS
-            DateTime a = DateTime.Now;
-            DataWrapperIdentidad idenDWGruposProyectos = identidadCN.ObtenerGruposEnvios(identidadID);
-            DateTime b = DateTime.Now;
-
-
+            // GRUPOS
             List<string> listaGruposBIS = new List<string>();
             List<GrupoIdentidadesEnvio> grupoIdentidades = idenDWGruposProyectos.ListaGrupoIdentidadesEnvio.Where(grupoIdentidadesAutocompletado => UtilCadenas.RemoveAccentsWithRegEx(grupoIdentidadesAutocompletado.NombreBusqueda).ToLower().Contains(UtilCadenas.RemoveAccentsWithRegEx(q).Trim().ToLower())).OrderByDescending(grupoIdentidadesAutocompletado => grupoIdentidadesAutocompletado.NombreBusqueda).ToList();
 
@@ -1166,7 +1166,7 @@ namespace Gnoss.Web.AutoComplete
             }
             listaGruposBIS.AddRange(listaNombres);
             listaNombres = listaGruposBIS.Distinct().ToArray();
-            #endregion
+
 
             string resultados = "";
             Array.Sort<string>(listaNombres);
@@ -1261,6 +1261,7 @@ namespace Gnoss.Web.AutoComplete
 
             Guid proyectoID = new Guid(proyecto);
 
+            IdentidadCN identidadCN = new IdentidadCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication);
             IdentidadCL identidadCL = new IdentidadCL(mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mServicesUtilVirtuosoAndReplication);
             DataWrapperIdentidad idenDW = new DataWrapperIdentidad();
             DataWrapperAmigos amigosDW = new DataWrapperAmigos();
@@ -1276,8 +1277,7 @@ namespace Gnoss.Web.AutoComplete
 
                 if (!amigosCL.ObtenerAmigos(identidadMyGnossID, idenDW, null, null, amigosDW, identidadOrganizacionID == identidadID, false))
                 {
-                    //TODO: Cargar si no esta en cache
-                    return Ok("");
+                    idenDW = identidadCN.ObtenerIdentidadesAmigos(identidadMyGnossID);
                 }
                 amigosCL.Dispose();
             }
@@ -1319,7 +1319,7 @@ namespace Gnoss.Web.AutoComplete
             }
 
             #region GRUPOS
-            IdentidadCN identidadCN = new IdentidadCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication);
+            
             DataWrapperIdentidad idenDSGruposProyectos = identidadCN.ObtenerGruposEnvios(identidadMyGnossID);
             identidadCN.Dispose();
             List<Es.Riam.Gnoss.AD.EntityModel.Models.IdentidadDS.GrupoIdentidades> grupos = idenDSGruposProyectos.ListaGrupoIdentidades.Where(item => UtilCadenas.RemoveAccentsWithRegEx(q).Trim().Contains(item.Nombre.Trim())).ToList();
@@ -2523,6 +2523,21 @@ namespace Gnoss.Web.AutoComplete
                 listaPerfilesBusqueda = identidadCN.ObtenerPerfilesParaAutocompletar(proyectoID, identidadID, busq, 30, !esEdicion);
             }
 
+            DataWrapperIdentidad dwIdentidad = null;            
+            if (traerDatos == 0 || traerDatos == 1 || traerDatos == 3)
+            {
+                // Obtenemos las organizaciones que administra el usuario
+                UsuarioCN usuarioCN = new UsuarioCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication);
+                Guid usuarioID = usuarioCN.ObtenerGuidUsuarioIDporIdentidadID(identidadID);          
+                OrganizacionCN organizacionCN = new OrganizacionCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication);
+                List<Guid> organizacionesAdministradasUsuario = usuarioCN.ObtenerOrganizacionesAdministradasPorUsuario(usuarioID);
+                // Obtenemos los usuarios que pertenecen a la organización y a esta comunidad
+                dwIdentidad = identidadCN.ObtenerIdentidadesDeOrganizaciones(organizacionesAdministradasUsuario, proyectoID);
+
+                usuarioCN.Dispose();
+                organizacionCN.Dispose();
+            }
+            
             //Obtenemos los grupos
             Dictionary<Guid, string> listaGruposBusqueda = new Dictionary<Guid, string>();
             if (traerDatos == 0 || traerDatos == 2)
@@ -2562,8 +2577,7 @@ namespace Gnoss.Web.AutoComplete
                 gestorIdentidades.Dispose();
                 gestorIdentidades = null;
             }
-
-            identidadCN.Dispose();
+      
             proyectoCN.Dispose();
 
 
@@ -2599,6 +2613,18 @@ namespace Gnoss.Web.AutoComplete
                     if (contador == 10)
                     {
                         break;
+                    }
+                }
+            }
+
+            if (dwIdentidad != null)
+            {
+                PersonaCN personaCN = new PersonaCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication);
+                foreach (Es.Riam.Gnoss.AD.EntityModel.Models.IdentidadDS.Perfil perfil in dwIdentidad.ListaPerfil)
+                {
+                    if (!listaPerfiles.ContainsKey(perfil.PerfilID) && (perfil.NombrePerfil.ToLower().Contains(busq.ToLower()) || perfil.NombrePerfil.ToLower().StartsWith(busq.ToLower())))
+                    {
+                        listaPerfiles.Add(perfil.PerfilID, $"{perfil.NombrePerfil} @ {perfil.NombreOrganizacion}");
                     }
                 }
             }
@@ -2684,6 +2710,7 @@ namespace Gnoss.Web.AutoComplete
             }
             #endregion
 
+            identidadCN.Dispose();
 
             return resultados;
         }
