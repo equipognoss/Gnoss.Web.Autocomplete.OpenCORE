@@ -29,6 +29,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Infrastructure;
 using Es.Riam.AbstractsOpen;
 using Es.Riam.OpenReplication;
 using Es.Riam.Gnoss.CL.RelatedVirtuoso;
+using Es.Riam.Gnoss.UtilServiciosWeb;
 
 namespace Gnoss.Web.AutoComplete
 {
@@ -47,12 +48,26 @@ namespace Gnoss.Web.AutoComplete
         public void ConfigureServices(IServiceCollection services)
 
         {
-            services.AddCors(options =>
+			ILoggerFactory loggerFactory =
+			LoggerFactory.Create(builder =>
+			{
+				builder.AddConfiguration(Configuration.GetSection("Logging"));
+				builder.AddSimpleConsole(options =>
+				{
+					options.IncludeScopes = true;
+					options.SingleLine = true;
+					options.TimestampFormat = "yyyy-MM-dd HH:mm:ss ";
+					options.UseUtcTimestamp = true;
+				});
+			});
+
+			services.AddSingleton(loggerFactory);
+			services.AddCors(options =>
             {
                 options.AddPolicy(name: "_myAllowSpecificOrigins",
                                   builder =>
                                   {
-                                      builder.SetIsOriginAllowed(ComprobarDominioEnBD);
+                                      builder.SetIsOriginAllowed(UtilServicios.ComprobarDominioPermitidoCORS);
                                       builder.AllowAnyHeader();
                                       builder.AllowAnyMethod();
                                       builder.AllowCredentials();
@@ -84,13 +99,12 @@ namespace Gnoss.Web.AutoComplete
             {
                 bdType = Configuration.GetConnectionString("connectionType");
             }
-            if (bdType.Equals("2"))
+            if (bdType.Equals("2") || bdType.Equals("1"))
             {
                 services.AddScoped(typeof(DbContextOptions<EntityContext>));
                 services.AddScoped(typeof(DbContextOptions<EntityContextBASE>));
             }
             services.AddSingleton(typeof(ConfigService));
-            services.AddSingleton<ILoggerFactory, LoggerFactory>();
             string acid = "";
             if (environmentVariables.Contains("acid"))
             {
@@ -119,7 +133,17 @@ namespace Gnoss.Web.AutoComplete
 
                         );
             }
-            else if (bdType.Equals("2"))
+			else if (bdType.Equals("1"))
+			{
+				services.AddDbContext<EntityContext, EntityContextOracle>(options =>
+						options.UseOracle(acid)
+						);
+				services.AddDbContext<EntityContextBASE, EntityContextBASEOracle>(options =>
+						options.UseOracle(baseConnection)
+
+						);
+			}
+			else if (bdType.Equals("2"))
             {
                 services.AddDbContext<EntityContext, EntityContextPostgres>(opt =>
                 {
@@ -141,16 +165,7 @@ namespace Gnoss.Web.AutoComplete
             // Resolve the services from the service provider
             var configService = sp.GetService<ConfigService>();
 
-            //TODO Javier
-            //BaseAD.LeerConfiguracionConexion(mGestorParametrosAplicacion.ListaConfiguracionBBDD.Where(confBBDD => confBBDD.TipoConexion.Equals((short)TipoConexion.SQLServer)).ToList());
-
-            //TODO Javier
-            //BaseCL.LeerConfiguracionCache(mGestorParametrosAplicacion.ListaConfiguracionBBDD.Where(confBBDD => confBBDD.TipoConexion.Equals((short)TipoConexion.Redis)).ToList());
-
             BaseCL.UsarCacheLocal = UsoCacheLocal.Siempre;
-
-            //TODO Javier
-            //BaseAD.LeerConfiguracionConexion(mGestorParametrosAplicacion.ListaConfiguracionBBDD.Where(confBBDD => confBBDD.TipoConexion.Equals((short)TipoConexion.Virtuoso)).ToList());
 
             string configLogStash = configService.ObtenerLogStashConnection();
             if (!string.IsNullOrEmpty(configLogStash))
@@ -159,19 +174,23 @@ namespace Gnoss.Web.AutoComplete
             }
             var loggingService = sp.GetService<LoggingService>();
             var entity = sp.GetService<EntityContext>();
-            //Establezco la ruta del fichero de error por defecto
-            LoggingService.RUTA_DIRECTORIO_ERROR = Path.Combine(mEnvironment.ContentRootPath, "logs");
+			var redisCacheWrapper = sp.GetService<RedisCacheWrapper>();
+			var servicesUtilVirtuosoAndReplication = sp.GetService<IServicesUtilVirtuosoAndReplication>();
+			//Establezco la ruta del fichero de error por defecto
+			LoggingService.RUTA_DIRECTORIO_ERROR = Path.Combine(mEnvironment.ContentRootPath, "logs");
 
             EstablecerDominioCache(entity);
 
-            CargarIdiomasPlataforma(configService);
+			UtilServicios.CargarIdiomasPlataforma(entity, loggingService, configService, servicesUtilVirtuosoAndReplication, redisCacheWrapper);
 
-            CargarTextosPersonalizadosDominio(entity, loggingService, configService);
+			CargarTextosPersonalizadosDominio(entity, loggingService, configService, redisCacheWrapper);
 
             CargarConfiguracionFacetado(loggingService, entity, configService);
 
             ConfigurarApplicationInsights(configService);
-            services.AddSwaggerGen(c =>
+
+			UtilServicios.CargarDominiosPermitidosCORS(entity);
+			services.AddSwaggerGen(c =>
             {
                 c.SwaggerDoc("v1", new OpenApiInfo { Title = "Gnoss.Web.AutoComplete", Version = "v1" });
             });
@@ -223,11 +242,6 @@ namespace Gnoss.Web.AutoComplete
             BaseCL.DominioEstatico = dominio;
         }
 
-        private void CargarIdiomasPlataforma(ConfigService configService)
-        {
-
-            configService.ObtenerListaIdiomas();
-        }
 
         private void ConfigurarApplicationInsights(ConfigService configService)
         {
@@ -266,7 +280,7 @@ namespace Gnoss.Web.AutoComplete
             }
         }
 
-        private void CargarTextosPersonalizadosDominio(EntityContext context, LoggingService loggingService, ConfigService configService)
+        private void CargarTextosPersonalizadosDominio(EntityContext context, LoggingService loggingService, ConfigService configService, RedisCacheWrapper redisCacheWrapper)
         {
             string dominio = mEnvironment.ApplicationName;
             Guid personalizacionEcosistemaID = Guid.Empty;
@@ -275,7 +289,7 @@ namespace Gnoss.Web.AutoComplete
             {
                 personalizacionEcosistemaID = new Guid(parametrosAplicacionPers[0].Valor.ToString());
             }
-            UtilIdiomas utilIdiomas = new UtilIdiomas("", loggingService, context, configService);
+            UtilIdiomas utilIdiomas = new UtilIdiomas("", loggingService, context, configService, redisCacheWrapper);
             utilIdiomas.CargarTextosPersonalizadosDominio(dominio, personalizacionEcosistemaID);
         }
 
