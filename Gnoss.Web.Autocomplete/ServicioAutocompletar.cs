@@ -1,9 +1,12 @@
 ﻿using Es.Riam.AbstractsOpen;
 using Es.Riam.Gnoss.AD.EntityModel;
 using Es.Riam.Gnoss.Logica.AutoCompletarNombres;
+using Es.Riam.Gnoss.Logica.ServiciosGenerales;
 using Es.Riam.Gnoss.Util.Configuracion;
 using Es.Riam.Gnoss.Util.General;
 using Es.Riam.Gnoss.UtilServiciosWeb;
+using Microsoft.Extensions.Logging;
+using Serilog.Core;
 using System;
 using System.Collections.Generic;
 
@@ -20,14 +23,17 @@ namespace Gnoss.Web.AutoComplete
         private EntityContext mEntityContext;
         private ConfigService mConfigService;
         private IServicesUtilVirtuosoAndReplication mServicesUtilVirtuosoAndReplication;
-
-        public ServicioAutocompletar(UtilServicios utilServicios, LoggingService loggingService, EntityContext entityContext, ConfigService configService, IServicesUtilVirtuosoAndReplication servicesUtilVirtuosoAndReplication)
+        private ILogger mlogger;
+        private ILoggerFactory mLoggerFactory;
+        public ServicioAutocompletar(UtilServicios utilServicios, LoggingService loggingService, EntityContext entityContext, ConfigService configService, IServicesUtilVirtuosoAndReplication servicesUtilVirtuosoAndReplication, ILogger<ServicioAutocompletar> logger, ILoggerFactory loggerFactory)
         {
             mUtilServicios = utilServicios;
             mLoggingService = loggingService;
             mEntityContext = entityContext;
             mConfigService = configService;
             mServicesUtilVirtuosoAndReplication = servicesUtilVirtuosoAndReplication;
+            mlogger = logger;
+            mLoggerFactory = loggerFactory;
         }
 
         #region Miembros
@@ -47,7 +53,7 @@ namespace Gnoss.Web.AutoComplete
 
             try
             {
-                ControladorAutoCompletarHilo contrHilo = new ControladorAutoCompletarHilo(pFiltro, pIdentidad, pProyecto, 5, mUtilServicios, mLoggingService, mEntityContext, mConfigService, mServicesUtilVirtuosoAndReplication);
+                ControladorAutoCompletarHilo contrHilo = new ControladorAutoCompletarHilo(pFiltro, pIdentidad, pProyecto, 5, mUtilServicios, mLoggingService, mEntityContext, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<ControladorAutoCompletarHilo>(), mLoggerFactory);
                 resultados = contrHilo.ObtenerResultados();
 
             }
@@ -92,7 +98,8 @@ namespace Gnoss.Web.AutoComplete
         private EntityContext mEntityContext;
         private ConfigService mConfigService;
         private IServicesUtilVirtuosoAndReplication mServicesUtilVirtuosoAndReplication;
-
+        private ILogger mlogger;
+        private ILoggerFactory mLoggerFactory;
         #endregion
 
         #region Constructor
@@ -108,7 +115,7 @@ namespace Gnoss.Web.AutoComplete
         /// <param name="pOrigen">Origen de los datos</param>
         /// <param name="pIdentidad">ID de la identidad que busca</param>
         /// <param name="pNumResultados">Número de resultados</param>
-        public ControladorAutoCompletarHilo(string pFiltro, Guid pIdentidad, Guid pProyecto, int pNumResultados, UtilServicios utilServicios, LoggingService loggingService, EntityContext entityContext, ConfigService configService, IServicesUtilVirtuosoAndReplication servicesUtilVirtuosoAndReplication)
+        public ControladorAutoCompletarHilo(string pFiltro, Guid pIdentidad, Guid pProyecto, int pNumResultados, UtilServicios utilServicios, LoggingService loggingService, EntityContext entityContext, ConfigService configService, IServicesUtilVirtuosoAndReplication servicesUtilVirtuosoAndReplication, ILogger<ControladorAutoCompletarHilo> logger, ILoggerFactory loggerFactory)
         {
             mFiltro = pFiltro;
             mProyectoID = pProyecto;
@@ -118,6 +125,8 @@ namespace Gnoss.Web.AutoComplete
             mLoggingService = loggingService;
             mConfigService = configService;
             mServicesUtilVirtuosoAndReplication = servicesUtilVirtuosoAndReplication;
+            mlogger = logger;
+            mLoggerFactory = loggerFactory;
         }
 
         #endregion
@@ -135,7 +144,7 @@ namespace Gnoss.Web.AutoComplete
             try
             {
                 AutoCompletarNombresCN autoCompetarCN = null;
-                autoCompetarCN = new AutoCompletarNombresCN("acid", mLoggingService, mEntityContext, mConfigService, mServicesUtilVirtuosoAndReplication);
+                autoCompetarCN = new AutoCompletarNombresCN("acid", mLoggingService, mEntityContext, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<AutoCompletarNombresCN>(), mLoggerFactory);
 
                 //(string pFiltro, string pIdentidad, string pidentidadOrg, string pProyecto)
                 resultados = autoCompetarCN.ObtenerNombresAutocompletar(mFiltro, mIdentidad, mProyectoID, mNumResultados);

@@ -1,11 +1,21 @@
+using Es.Riam.AbstractsOpen;
 using Es.Riam.Gnoss.AD.EntityModel;
+using Es.Riam.Gnoss.AD.EntityModelBASE;
+using Es.Riam.Gnoss.AD.Facetado;
+using Es.Riam.Gnoss.AD.ParametroAplicacion;
 using Es.Riam.Gnoss.AD.Virtuoso;
 using Es.Riam.Gnoss.CL;
+using Es.Riam.Gnoss.CL.RelatedVirtuoso;
 using Es.Riam.Gnoss.Elementos.ParametroAplicacion;
+using Es.Riam.Gnoss.Recursos;
 using Es.Riam.Gnoss.Util.Configuracion;
 using Es.Riam.Gnoss.Util.General;
 using Es.Riam.Gnoss.Util.Seguridad;
-using System.Linq;
+using Es.Riam.Gnoss.UtilServiciosWeb;
+using Es.Riam.Gnoss.Web.Controles.ParametroAplicacionGBD;
+using Es.Riam.Interfaces.InterfacesOpen;
+using Es.Riam.Open;
+using Es.Riam.OpenReplication;
 using Es.Riam.Util;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -15,21 +25,13 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi.Models;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Infrastructure;
+using ServicioAutoCompletarMVC;
 using System;
 using System.Collections;
-using System.IO;
 using System.Collections.Generic;
-using Es.Riam.Gnoss.AD.ParametroAplicacion;
-using Es.Riam.Gnoss.Recursos;
-using Es.Riam.Gnoss.AD.EntityModelBASE;
-using ServicioAutoCompletarMVC;
-using Es.Riam.Gnoss.Web.Controles.ParametroAplicacionGBD;
-using Es.Riam.Gnoss.AD.Facetado;
-using Npgsql.EntityFrameworkCore.PostgreSQL.Infrastructure;
-using Es.Riam.AbstractsOpen;
-using Es.Riam.OpenReplication;
-using Es.Riam.Gnoss.CL.RelatedVirtuoso;
-using Es.Riam.Gnoss.UtilServiciosWeb;
+using System.IO;
+using System.Linq;
 
 namespace Gnoss.Web.AutoComplete
 {
@@ -89,6 +91,7 @@ namespace Gnoss.Web.AutoComplete
             services.AddScoped(typeof(VirtuosoAD));
             services.AddScoped(typeof(RelatedVirtuosoCL));
             services.AddScoped<IServicesUtilVirtuosoAndReplication, ServicesVirtuosoAndBidirectionalReplicationOpen>();
+            services.AddScoped<IAvailableServices, AvailableServicesOpen>();
             string bdType = "";
             IDictionary environmentVariables = Environment.GetEnvironmentVariables();
             if (environmentVariables.Contains("connectionType"))
@@ -126,10 +129,10 @@ namespace Gnoss.Web.AutoComplete
             if (bdType.Equals("0"))
             {
                 services.AddDbContext<EntityContext>(options =>
-                        options.UseSqlServer(acid)
+                        options.UseSqlServer(acid, o => o.UseCompatibilityLevel(110))
                         );
                 services.AddDbContext<EntityContextBASE>(options =>
-                        options.UseSqlServer(baseConnection)
+                        options.UseSqlServer(baseConnection, o => o.UseCompatibilityLevel(110))
 
                         );
             }
@@ -181,15 +184,16 @@ namespace Gnoss.Web.AutoComplete
 
             EstablecerDominioCache(entity);
 
-			UtilServicios.CargarIdiomasPlataforma(entity, loggingService, configService, servicesUtilVirtuosoAndReplication, redisCacheWrapper);
+            UtilServicios.CargarIdiomasPlataforma(entity, loggingService, configService, servicesUtilVirtuosoAndReplication, redisCacheWrapper, loggerFactory);
 
-			CargarTextosPersonalizadosDominio(entity, loggingService, configService, redisCacheWrapper);
+            CargarTextosPersonalizadosDominio(entity, loggingService, configService, redisCacheWrapper, loggerFactory);
 
             CargarConfiguracionFacetado(loggingService, entity, configService);
 
             ConfigurarApplicationInsights(configService);
 
 			UtilServicios.CargarDominiosPermitidosCORS(entity);
+
 			services.AddSwaggerGen(c =>
             {
                 c.SwaggerDoc("v1", new OpenApiInfo { Title = "Gnoss.Web.AutoComplete", Version = "v1" });
@@ -203,7 +207,7 @@ namespace Gnoss.Web.AutoComplete
             {
                 app.UseDeveloperExceptionPage();
                 app.UseSwagger();
-                app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Gnoss.Web.AutoComplete v1"));
+                app.UseSwaggerUI(c => c.SwaggerEndpoint("v1/swagger.json", "Gnoss.Web.AutoComplete v1"));
             }
 
             app.UseHttpsRedirection();
@@ -218,11 +222,6 @@ namespace Gnoss.Web.AutoComplete
             {
                 endpoints.MapControllers();
             });
-        }
-
-        private bool ComprobarDominioEnBD(string dominio)
-        {
-            return true;
         }
 
         /// <summary>
@@ -280,7 +279,7 @@ namespace Gnoss.Web.AutoComplete
             }
         }
 
-        private void CargarTextosPersonalizadosDominio(EntityContext context, LoggingService loggingService, ConfigService configService, RedisCacheWrapper redisCacheWrapper)
+        private void CargarTextosPersonalizadosDominio(EntityContext context, LoggingService loggingService, ConfigService configService, RedisCacheWrapper redisCacheWrapper, ILoggerFactory mLoggerFactory)
         {
             string dominio = mEnvironment.ApplicationName;
             Guid personalizacionEcosistemaID = Guid.Empty;
@@ -289,7 +288,7 @@ namespace Gnoss.Web.AutoComplete
             {
                 personalizacionEcosistemaID = new Guid(parametrosAplicacionPers[0].Valor.ToString());
             }
-            UtilIdiomas utilIdiomas = new UtilIdiomas("", loggingService, context, configService, redisCacheWrapper);
+            UtilIdiomas utilIdiomas = new UtilIdiomas("", loggingService, context, configService, redisCacheWrapper, mLoggerFactory.CreateLogger<UtilIdiomas>(), mLoggerFactory);
             utilIdiomas.CargarTextosPersonalizadosDominio(dominio, personalizacionEcosistemaID);
         }
 

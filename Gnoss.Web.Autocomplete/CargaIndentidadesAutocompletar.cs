@@ -12,6 +12,9 @@ using Es.Riam.Gnoss.Util.Configuracion;
 using Es.Riam.Gnoss.CL;
 using System.Threading.Tasks;
 using Es.Riam.AbstractsOpen;
+using Microsoft.Extensions.Logging;
+using Serilog.Core;
+using Es.Riam.Gnoss.Logica.ServiciosGenerales;
 
 namespace Gnoss.Web.AutoComplete
 {
@@ -33,7 +36,8 @@ namespace Gnoss.Web.AutoComplete
         private ConfigService mConfigService;
         private RedisCacheWrapper mRedisCacheWrapper;
         private IServicesUtilVirtuosoAndReplication mServicesUtilVirtuosoAndReplication;
-
+        private ILogger mlogger;
+        private ILoggerFactory mLoggerFactory;
         #endregion
 
         #region Constructor
@@ -43,13 +47,14 @@ namespace Gnoss.Web.AutoComplete
         /// </summary>
         /// <param name="pIdentidadID">ID de identidad</param>
         /// <param name="pIdentidadOrgID">ID de identidad de organización</param>
-        public CargaIndentidadesAutocompletar(Guid pIdentidadID, Guid pIdentidadOrgID, bool pCargarIdentidadesPrivadas, LoggingService loggingService, EntityContext entityContext, ConfigService configService, RedisCacheWrapper redisCacheWrapper, IServicesUtilVirtuosoAndReplication servicesUtilVirtuosoAndReplication)
+        public CargaIndentidadesAutocompletar(Guid pIdentidadID, Guid pIdentidadOrgID, bool pCargarIdentidadesPrivadas, LoggingService loggingService, EntityContext entityContext, ConfigService configService, RedisCacheWrapper redisCacheWrapper, IServicesUtilVirtuosoAndReplication servicesUtilVirtuosoAndReplication, ILogger<CargaIndentidadesAutocompletar> logger, ILoggerFactory loggerFactory)
         {
             mRedisCacheWrapper = redisCacheWrapper;
             mLoggingService = loggingService;
             mEntityContext = entityContext;
             mConfigService = configService;
-
+            mlogger = logger;
+            mLoggerFactory = loggerFactory;
             mIdentidadID = pIdentidadID;
             mIdentidadOrgID = pIdentidadOrgID;
             mCargarIdentidadesPrivadas = pCargarIdentidadesPrivadas;
@@ -77,7 +82,7 @@ namespace Gnoss.Web.AutoComplete
             {
                 //Thread.Sleep(5000);
                 Identidad identidad = null;
-                IdentidadCN identCN = new IdentidadCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication);
+                IdentidadCN identCN = new IdentidadCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<IdentidadCN>(), mLoggerFactory);
                 List<Guid> listID = new List<Guid>();
                 listID.Add(mIdentidadID);
                 GestionIdentidades gestorIdent = new GestionIdentidades(identCN.ObtenerIdentidadesPorID(listID, false), mLoggingService, mEntityContext, mConfigService, mServicesUtilVirtuosoAndReplication);
@@ -125,10 +130,10 @@ namespace Gnoss.Web.AutoComplete
             }
 
             DataWrapperIdentidad dataWrapperIdentidad = new DataWrapperIdentidad();
-            AmigosCL amigosCL = new AmigosCL(/*TODO Javier Conexion.ObtenerUrlFicheroConfigXML() + */"@@@acid", /*TODO Javier Conexion.ObtenerUrlFicheroConfigXML() + */"@@@acid", mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mServicesUtilVirtuosoAndReplication);
+            AmigosCL amigosCL = new AmigosCL(/*TODO Javier Conexion.ObtenerUrlFicheroConfigXML() + */"@@@acid", /*TODO Javier Conexion.ObtenerUrlFicheroConfigXML() + */"@@@acid", mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<AmigosCL>(), mLoggerFactory);
             if (!amigosCL.ObtenerAmigosEIdentidadesEnMisProyectosPrivados(identidad, dataWrapperIdentidad, pCargarAmigosIdentidadOrganizacion, false))
             {
-                IdentidadCN identidadCN = new IdentidadCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication);
+                IdentidadCN identidadCN = new IdentidadCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<IdentidadCN>(), mLoggerFactory);
 
                 List<Guid> identEnMisProyPriv = identidadCN.ObtenerIdentidadesIDEnMisProyectosPrivados(identidad);
 

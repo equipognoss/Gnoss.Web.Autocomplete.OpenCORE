@@ -47,6 +47,10 @@ using Microsoft.AspNetCore.Mvc;
 using Es.Riam.Gnoss.AD.EntityModel.Models.UsuarioDS;
 using Es.Riam.Gnoss.AD.Usuarios.Model;
 using Microsoft.Exchange.WebServices.Data;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion.Internal;
+using Es.Riam.Interfaces.InterfacesOpen;
+using Microsoft.Extensions.Logging;
+using Serilog.Core;
 
 namespace Gnoss.Web.AutoComplete
 {
@@ -67,10 +71,12 @@ namespace Gnoss.Web.AutoComplete
         private GnossCache mGnossCache;
         private EntityContextBASE mEntityContextBASE;
         private IServicesUtilVirtuosoAndReplication mServicesUtilVirtuosoAndReplication;
-		private static List<string> PropiedadesOntologiasBasicas = new List<string>() { "rdf:type" };
-
-		public AutoCompletarController(EntityContext entityContext, LoggingService loggingService, ConfigService configService, RedisCacheWrapper redisCacheWrapper, VirtuosoAD virtuosoAD, IHttpContextAccessor httpContextAccessor, GnossCache gnossCache, EntityContextBASE entityContextBASE, IServicesUtilVirtuosoAndReplication servicesUtilVirtuosoAndReplication)
-            : base(loggingService, configService, entityContext, redisCacheWrapper, gnossCache, virtuosoAD, httpContextAccessor, servicesUtilVirtuosoAndReplication)
+        private IAvailableServices mAvailableServices;
+        private static List<string> PropiedadesOntologiasBasicas = new List<string>() { "rdf:type" };
+        private ILogger mlogger;
+        private ILoggerFactory mLoggerFactory;
+        public AutoCompletarController(EntityContext entityContext, LoggingService loggingService, ConfigService configService, RedisCacheWrapper redisCacheWrapper, VirtuosoAD virtuosoAD, IHttpContextAccessor httpContextAccessor, GnossCache gnossCache, EntityContextBASE entityContextBASE, IServicesUtilVirtuosoAndReplication servicesUtilVirtuosoAndReplication, IAvailableServices availableServices, ILogger<AutoCompletarController> logger, ILoggerFactory loggerFactory)
+            : base(loggingService, configService, entityContext, redisCacheWrapper, gnossCache, virtuosoAD, httpContextAccessor, servicesUtilVirtuosoAndReplication,logger,loggerFactory)
         {
             mEntityContext = entityContext;
             mLoggingService = loggingService;
@@ -81,8 +87,11 @@ namespace Gnoss.Web.AutoComplete
             mGnossCache = gnossCache;
             mEntityContextBASE = entityContextBASE;
             mServicesUtilVirtuosoAndReplication = servicesUtilVirtuosoAndReplication;
-            mUtilServicios = new UtilServicios(loggingService, entityContext, configService, redisCacheWrapper, gnossCache, mServicesUtilVirtuosoAndReplication);
-            mUtilServiciosFacetas = new UtilServiciosFacetas(loggingService, entityContext, configService, redisCacheWrapper, virtuosoAD, mServicesUtilVirtuosoAndReplication);
+            mAvailableServices = availableServices;
+            mlogger = logger;
+            mLoggerFactory = loggerFactory;
+            mUtilServicios = new UtilServicios(loggingService, entityContext, configService, redisCacheWrapper, gnossCache, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<UtilServicios>(), mLoggerFactory);
+            mUtilServiciosFacetas = new UtilServiciosFacetas(loggingService, entityContext, configService, redisCacheWrapper, virtuosoAD, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<UtilServiciosFacetas>(), mLoggerFactory);
         }
 
         #region Miembros
@@ -133,7 +142,7 @@ namespace Gnoss.Web.AutoComplete
             string resultados = "";
             try
             {
-                if(tipo == null)
+                if (tipo == null)
                 {
                     tipo = "";
                 }
@@ -161,7 +170,7 @@ namespace Gnoss.Web.AutoComplete
                 }
                 else if (tipo == FacetadoAD.BUSQUEDA_MENSAJES)
                 {
-                    UsuarioCN usuarioCN = new UsuarioCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication);
+                    UsuarioCN usuarioCN = new UsuarioCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<UsuarioCN>(), mLoggerFactory);
                     Guid? usuarioID = usuarioCN.ObtenerUsuarioIDPorIDPerfil(new Guid(perfil));
                     usuarioCN.Dispose();
                     if (!usuarioID.HasValue)
@@ -188,11 +197,11 @@ namespace Gnoss.Web.AutoComplete
 
                 if (listaFiltros.ContainsKey("rdf:type") && (listaFiltros["rdf:type"].Contains("Mensaje") || listaFiltros["rdf:type"].Contains("Comentario") || listaFiltros["rdf:type"].Contains("Invitacion")))
                 {
-                    facetadoCL = new FacetadoCL("acidHome", "", UrlIntragnoss, mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mVirtuosoAD, mServicesUtilVirtuosoAndReplication);
+                    facetadoCL = new FacetadoCL("acidHome", "", UrlIntragnoss, mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mVirtuosoAD, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<FacetadoCL>(), mLoggerFactory);
                 }
                 else
                 {
-                    facetadoCL = new FacetadoCL(UrlIntragnoss, mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mVirtuosoAD, mServicesUtilVirtuosoAndReplication);
+                    facetadoCL = new FacetadoCL(UrlIntragnoss, mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mVirtuosoAD, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<FacetadoCL>(), mLoggerFactory);
                 }
 
                 List<string> listaTagsAñadidos = new List<string>();
@@ -242,7 +251,7 @@ namespace Gnoss.Web.AutoComplete
 
                 if (!tipo.Equals(FacetadoAD.BUSQUEDA_PERSONASYORG) && !tipo.Equals(FacetadoAD.BUSQUEDA_RECURSOS) && !tipo.Equals(FacetadoAD.BUSQUEDA_PERSONA) && !tipo.Equals(FacetadoAD.BUSQUEDA_PREGUNTAS) && !tipo.Equals(FacetadoAD.BUSQUEDA_DEBATES) && !tipo.Equals(FacetadoAD.BUSQUEDA_ORGANIZACION) && !tipo.Equals(FacetadoAD.BUSQUEDA_CONTACTOS))
                 {
-                    FacetaCL facetaCL = new FacetaCL(mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mServicesUtilVirtuosoAndReplication);
+                    FacetaCL facetaCL = new FacetaCL(mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<FacetaCL>(), mLoggerFactory);
                     formulariosSemanticos = facetaCL.ObtenerPredicadosSemanticos(ProyectoAD.MetaOrganizacion, mProyectoID);
                 }
                 else
@@ -273,7 +282,7 @@ namespace Gnoss.Web.AutoComplete
                     else if ((tipo == FacetadoAD.BUSQUEDA_AVANZADA) || (tipo == FacetadoAD.BUSQUEDA_RECURSOS))
                     {
                         //ObtenerOntologias
-                        FacetaCL facetaCL = new FacetaCL(mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mServicesUtilVirtuosoAndReplication);
+                        FacetaCL facetaCL = new FacetaCL(mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<FacetaCL>(), mLoggerFactory);
                         DataWrapperFacetas tConfiguracion = new DataWrapperFacetas();
                         tConfiguracion.ListaOntologiaProyecto = facetaCL.ObtenerOntologiasProyecto(Guid.Empty, new Guid(proyecto)/*, "es"*/);
                         foreach (Es.Riam.Gnoss.AD.EntityModel.Models.Faceta.OntologiaProyecto myrow in tConfiguracion.ListaOntologiaProyecto)
@@ -319,7 +328,7 @@ namespace Gnoss.Web.AutoComplete
 
                         if (!string.IsNullOrEmpty(organizacion))
                         {
-                            IdentidadCN identCN = new IdentidadCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication);
+                            IdentidadCN identCN = new IdentidadCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<IdentidadCN>(), mLoggerFactory);
                             grafo = "perfil/" + identCN.ObtenerPerfilPersonalDePerfil(new Guid(perfil)).ToString().ToLower();
                         }
                     }
@@ -367,7 +376,7 @@ namespace Gnoss.Web.AutoComplete
                         }
                     }
 
-                    facetadoCL.ObtenerAutocompletar(grafo, facetadoDS, listaFiltros, listaFiltrosExtra, esMyGnoss, estaEnProyecto, esUsuarioInvitado, identidad, 0, 11 + listaTagsAñadidos.Count, formulariosSemanticos, filtrosContexto);
+                    facetadoCL.ObtenerAutocompletar(grafo, facetadoDS, listaFiltros, listaFiltrosExtra, esMyGnoss, estaEnProyecto, esUsuarioInvitado, identidad, 0, 11 + listaTagsAñadidos.Count, formulariosSemanticos, filtrosContexto, mAvailableServices);
                     nombreFaceta = "Autocompletar";
                 }
                 else
@@ -393,7 +402,7 @@ namespace Gnoss.Web.AutoComplete
                     }
 
 
-                    ProyectoCL proyCL = new ProyectoCL(mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mVirtuosoAD, mServicesUtilVirtuosoAndReplication);
+                    ProyectoCL proyCL = new ProyectoCL(mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mVirtuosoAD, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<ProyectoCL>(), mLoggerFactory);
                     TipoProyecto tipoProy = proyCL.ObtenerTipoProyecto(ProyectoID);
 
                     //TODO: No borrar, hay que recuperarlos cuando se cargen los tags con peso en DBLP
@@ -412,7 +421,7 @@ namespace Gnoss.Web.AutoComplete
                     {*/
                     if (proyecto.ToLower() == "bab08a33-4041-4450-aef8-aafb6ea7d2a4") //DBLP
                     {
-                        facetadoCL.ObtenerFacetaSinOrdenDBLP(grafo, facetadoDS, nombreFaceta, listaFiltros, listaFiltrosExtra, esMyGnoss, estaEnProyecto, esUsuarioInvitado, identidad, TipoDisenio.ListaOrdCantidad, 0, 11, formulariosSemanticos, filtrosContexto, tipoProy, false, null, true, false);
+                        facetadoCL.ObtenerFacetaSinOrdenDBLP(grafo, facetadoDS, nombreFaceta, listaFiltros, listaFiltrosExtra, esMyGnoss, estaEnProyecto, esUsuarioInvitado, identidad, TipoDisenio.ListaOrdCantidad, 0, 11, formulariosSemanticos, filtrosContexto, tipoProy, false, null, true, false, mAvailableServices);
                     }
                     else
                     {
@@ -491,7 +500,7 @@ namespace Gnoss.Web.AutoComplete
         private bool ObtenerFiltrosPestanya(Guid pPestanyaID, Dictionary<string, List<string>> pListaFiltros)
         {
             bool hayPestanyaBusqueda = false;
-            ProyectoCL proyCL = new ProyectoCL(mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mVirtuosoAD, mServicesUtilVirtuosoAndReplication);
+            ProyectoCL proyCL = new ProyectoCL(mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mVirtuosoAD, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<ProyectoCL>(), mLoggerFactory);
             DataWrapperProyecto dataWrapperProyecto = proyCL.ObtenerPestanyasProyecto(mProyectoID);
 
             ProyectoPestanyaBusqueda filaPestanyaBusqueda = dataWrapperProyecto.ListaProyectoPestanyaBusqueda.FirstOrDefault(proy => proy.PestanyaID.Equals(pPestanyaID));
@@ -506,7 +515,7 @@ namespace Gnoss.Web.AutoComplete
                 pListaFiltros["rdf:type"].Add(FacetadoAD.BUSQUEDA_RECURSOS);
 
                 //ObtenerOntologias
-                FacetaCL facetaCL = new FacetaCL(mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mServicesUtilVirtuosoAndReplication);
+                FacetaCL facetaCL = new FacetaCL(mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<FacetaCL>(), mLoggerFactory);
                 DataWrapperFacetas tConfiguracion = new DataWrapperFacetas();
                 tConfiguracion.ListaOntologiaProyecto = facetaCL.ObtenerOntologiasProyecto(Guid.Empty, mProyectoID);
 
@@ -674,13 +683,13 @@ namespace Gnoss.Web.AutoComplete
             string resultados = "";
             try
             {
-                FacetadoCL facetadoCL = new FacetadoCL(UrlIntragnoss, mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mVirtuosoAD, mServicesUtilVirtuosoAndReplication);
+                FacetadoCL facetadoCL = new FacetadoCL(UrlIntragnoss, mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mVirtuosoAD, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<FacetadoCL>(), mLoggerFactory);
                 //Obtenemos las facetas excluyentes de esta busqueda...
                 //facetadoCL.DiccionarioFacetasExcluyentes = ObtenerDiccionarioFacetasExcluyentes();
 
                 FacetadoDS facetadoDS = new FacetadoDS();
 
-                facetadoCL.ObtieneDatosAutocompletar(pFaceta, q, facetadoDS);
+                facetadoCL.ObtieneDatosAutocompletar(pFaceta, q, facetadoDS, Guid.Empty, mAvailableServices);
                 foreach (DataRow fila in facetadoDS.Tables[0].Rows)
                 {
                     string valor = fila[0].ToString();
@@ -726,13 +735,15 @@ namespace Gnoss.Web.AutoComplete
         public IActionResult AutoCompletarSeleccEntDocSem([FromForm] string q, [FromForm] string pGrafo, [FromForm] string pEntContenedora, [FromForm] string pPropiedad, [FromForm] string pTipoEntidadSolicitada, [FromForm] string pPropSolicitadas, [FromForm] string pControlID, [FromForm] string pExtraWhere, [FromForm] string pIdioma, [FromForm] string pProyectoID, [FromForm] string identidad)
         {
             string resultados = "";
+            string entidadID = "";
+
             try
             {
-                if(pExtraWhere == null)
+                if (pExtraWhere == null)
                 {
                     pExtraWhere = "";
                 }
-                if(pIdioma == null)
+                if (pIdioma == null)
                 {
                     pIdioma = "";
                 }
@@ -748,6 +759,38 @@ namespace Gnoss.Web.AutoComplete
                     pControlID = pControlID.Substring(1, pControlID.Length - 2);
                     pExtraWhere = pExtraWhere.Substring(1, pExtraWhere.Length - 2);
                     pIdioma = pIdioma.Substring(1, pIdioma.Length - 2);
+                }
+
+                FacetadoCN facetadoCN = new FacetadoCN(UrlIntragnoss, pGrafo, mEntityContext, mLoggingService, mConfigService, mVirtuosoAD, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<FacetadoCN>(), mLoggerFactory);
+                FacetadoDS facetadoDS = null;
+                if (Guid.TryParse(q, out Guid docID))
+                {
+                    DocumentacionCN docCN = new DocumentacionCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<DocumentacionCN>(), mLoggerFactory);
+                    string titulo = docCN.ObtenerTituloDocumentoPorID(docID);
+                    if (!string.IsNullOrEmpty(titulo))
+                    {
+                        string query = $"SELECT DISTINCT ?s from <{UrlIntragnoss}{pGrafo}> WHERE {{ ?s ?p ?o. ?documento <http://gnoss/hasEntidad> ?s. FILTER (?documento = <{UrlIntragnoss}{docID}>)}}";
+                        if (!UrlIntragnoss.EndsWith('/'))
+                        {
+                            query = $"SELECT DISTINCT ?s from <{UrlIntragnoss}{pGrafo}> WHERE {{ ?s ?p ?o. ?documento <http://gnoss/hasEntidad> ?s. FILTER (?documento = <{UrlIntragnoss}/{docID}>)}}";
+                        }
+                        string nombreTabla = "IdRecursoLargo";
+                        facetadoDS = facetadoCN.LeerDeVirtuoso(query, nombreTabla, pGrafo);
+                        if (facetadoDS.Tables[nombreTabla] != null)
+                        {
+                            if (facetadoDS.Tables[nombreTabla].Rows.Count > 0)
+                            {
+                                DataRow fila = facetadoDS.Tables[nombreTabla].Rows[0];
+                                entidadID = (string)fila[0];
+
+                                resultados = $"{titulo}|||formSem|||{entidadID}|||{pControlID}";
+                            }
+                        }
+                    }
+
+                    facetadoCN.Dispose();
+
+                    return Ok(resultados);
                 }
 
                 pExtraWhere = pExtraWhere.Replace("[--C]", "<").Replace("[C--]", ">");
@@ -800,8 +843,7 @@ namespace Gnoss.Web.AutoComplete
                 List<string> propsPrimeraConsulta = new List<string>();
                 propsPrimeraConsulta.Add(propSelec[0]);
 
-                FacetadoCN facetadoCN = new FacetadoCN(UrlIntragnoss, pGrafo, mEntityContext, mLoggingService, mConfigService, mVirtuosoAD, mServicesUtilVirtuosoAndReplication);
-                FacetadoDS facetadoDS = facetadoCN.ObtenerRDFXMLSelectorEntidadFormulario(pGrafo, pEntContenedora, pPropiedad, pTipoEntidadSolicitada, propsPrimeraConsulta, q, pExtraWhere, pIdioma, new Guid(identidad), new Guid(pProyectoID));
+                facetadoDS = facetadoCN.ObtenerRDFXMLSelectorEntidadFormulario(pGrafo, pEntContenedora, pPropiedad, pTipoEntidadSolicitada, propsPrimeraConsulta, q, pExtraWhere, pIdioma, new Guid(identidad), new Guid(pProyectoID));
 
                 #region Propiedades extra a la principal
 
@@ -813,7 +855,7 @@ namespace Gnoss.Web.AutoComplete
 
                     foreach (DataRow fila in facetadoDS.Tables[0].Rows)
                     {
-                        string entidadID = (string)fila[0];
+                        entidadID = (string)fila[0];
                         entidades.Add(entidadID);
                     }
 
@@ -834,7 +876,7 @@ namespace Gnoss.Web.AutoComplete
                         {
                             DataRow fila = facetadoDS.Tables[0].Rows[i];
 
-                            string entidadID = (string)fila[0];
+                            entidadID = (string)fila[0];
                             string nombre = (string)fila[2];
 
                             #region Propiedades extra
@@ -914,7 +956,7 @@ namespace Gnoss.Web.AutoComplete
 
                 q = "%" + q;
 
-                FacetadoCN facetadoCN = new FacetadoCN(UrlIntragnoss, pGrafo, mEntityContext, mLoggingService, mConfigService, mVirtuosoAD, mServicesUtilVirtuosoAndReplication);
+                FacetadoCN facetadoCN = new FacetadoCN(UrlIntragnoss, pGrafo, mEntityContext, mLoggingService, mConfigService, mVirtuosoAD, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<FacetadoCN>(), mLoggerFactory);
                 FacetadoDS facetadoDS = facetadoCN.ObtenerValoresGrafoDependientesFormulario(pGrafo, pTipoEntDep, pIDValorPadre, q);
 
                 if (facetadoDS.Tables[0].Rows.Count > 0)
@@ -949,18 +991,9 @@ namespace Gnoss.Web.AutoComplete
         public IActionResult AutoCompletarEnvioMensajes([FromForm] string q, [FromForm] string lista, [FromForm] string identidad, [FromForm] string identidadOrg, [FromForm] string bool_esGnossOrganiza)
         {
             List<string> listaAnteriores = new List<string>();
-            if (!string.IsNullOrEmpty(lista))
+            if (!string.IsNullOrWhiteSpace(lista))
             {
-                string[] arrayAnteriores = lista.Split(',');
-                //Recorro el array para limpiar los espacios vacios.
-                foreach (string elementoAnt in arrayAnteriores)
-                {
-                    string elemento = elementoAnt.Trim();
-                    if (elemento != "" && !listaAnteriores.Contains(elemento))
-                    {
-                        listaAnteriores.Add(elemento);
-                    }
-                }
+                listaAnteriores = lista.Split(',', StringSplitOptions.RemoveEmptyEntries).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();
             }
 
             string[] listaNombres;
@@ -973,13 +1006,13 @@ namespace Gnoss.Web.AutoComplete
                 identidadOrganizacionID = new Guid(identidadOrg);
             }
 
-            IdentidadCN identidadCN = new IdentidadCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication);
+            IdentidadCN identidadCN = new IdentidadCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<IdentidadCN>(), mLoggerFactory);
             List<string> resultadosPerfil = new List<string>();
 
-            AmigosCL amigosCL = new AmigosCL(mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mServicesUtilVirtuosoAndReplication);
+            AmigosCL amigosCL = new AmigosCL(mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<AmigosCL>(), mLoggerFactory);
             Guid valorCacheInvalidarLocal = amigosCL.ObtenerCacheAutocompletarInvalidar();
 
-            if(valorCacheInvalidarLocal != Guid.Empty && !mValorInvalidarCacheLocal.Equals(valorCacheInvalidarLocal))
+            if (valorCacheInvalidarLocal != Guid.Empty && !mValorInvalidarCacheLocal.Equals(valorCacheInvalidarLocal))
             {
                 string fileName = $"{AppDomain.CurrentDomain.SetupInformation.ApplicationBase}/config/versionCacheLocal/{Guid.Empty}.config";
                 FileInfo fileInfo = new FileInfo(fileName);
@@ -1012,8 +1045,6 @@ namespace Gnoss.Web.AutoComplete
                 string busq = UtilCadenas.RemoveAccentsWithRegEx(q);
                 List<Es.Riam.Gnoss.AD.EntityModel.Models.IdentidadDS.Identidad> filasMiPefil = idenDW.ListaIdentidad.Where(ident => ident.IdentidadID.Equals(identidadID)).ToList();
 
-                string sql = "(NombreBusqueda LIKE '% " + busq.Trim() + "%' OR NombreBusqueda LIKE '" + busq.Trim() + "%')";
-
                 //Comprobar que hay más de una fila en el DS del Perfil
                 if (idenDW.ListaPerfil.Count > 0)
                 {
@@ -1044,19 +1075,7 @@ namespace Gnoss.Web.AutoComplete
 
                         if (!listaAnteriores.Contains(nombrePerfil.ToLower()))
                         {
-                            //Si es el nombre de una clase, no se debe mostrar porque no se tienen que mostrar las organizaciones de tipo clase.
-
-                            //CargarDS de OrganizaciónClase y preguntar por la organización del perfil.
-                            if (perfil.PersonaID.HasValue)
-                            {
-                                //Si la personaID es nula, y es una clase no se agrega.
-                                resultadosPerfil.Add(nombrePerfil);
-                            }
-                            else
-                            {
-                                //Si el perfil no es una clase la agregamos al autocompletar.
-                                resultadosPerfil.Add(nombrePerfil);
-                            }
+                            resultadosPerfil.Add(nombrePerfil);
                         }
                     }
                 }
@@ -1097,18 +1116,7 @@ namespace Gnoss.Web.AutoComplete
 
                         if (!listaAnteriores.Contains(nombrePerfil.ToLower()))
                         {
-                            //Si es el nombre de una clase, no se debe mostrar porque no se tienen que mostrar las organizaciones de tipo clase.
-                            //Hay que hacer una query por linq al DS
-                            if (perfil.PersonaID.HasValue)
-                            {
-                                //Es un perfil distinto de organización / clase
-                                resultadosPerfil.Add(nombrePerfil);
-                            }
-                            else
-                            {
-                                //Si el perfil no es una clase la agregamos al autocompletar.
-                                resultadosPerfil.Add(nombrePerfil);
-                            }
+                            resultadosPerfil.Add(nombrePerfil);
                         }
                     }
                 }
@@ -1142,15 +1150,8 @@ namespace Gnoss.Web.AutoComplete
 
                     resultadosPerfil.AddRange(listaNombres2);
                 }
-
-                #region Cargar Amigos
-
-                CargaIndentidadesAutocompletar cargarIdent = new CargaIndentidadesAutocompletar(identidadID, identidadOrganizacionID, CargarIdentidadesDeProyectosPrivadosComoAmigos, mLoggingService, mEntityContext, mConfigService, mRedisCacheWrapper, mServicesUtilVirtuosoAndReplication);
-                cargarIdent.Cargar();
-
-                #endregion
+                amigosCL.RefrescarCacheAmigos(identidadID, mEntityContextBASE, mAvailableServices, bool.Parse(bool_esGnossOrganiza));
             }
-
             listaNombres = resultadosPerfil.Distinct().ToArray();
 
             // GRUPOS
@@ -1169,17 +1170,8 @@ namespace Gnoss.Web.AutoComplete
 
 
             string resultados = "";
-            Array.Sort<string>(listaNombres);
-            for (int i = 0; i < listaNombres.Length; i++)
-            {
-                if (i >= 10)
-                {
-                    break;
-                }
-                resultados += listaNombres[i];
-                resultados += Environment.NewLine;
+            resultados = string.Join(Environment.NewLine, listaNombres.Distinct().OrderBy(x => x).Take(10));
 
-            }
             return Ok(resultados);
         }
 
@@ -1208,7 +1200,7 @@ namespace Gnoss.Web.AutoComplete
             {
                 try
                 {
-                    ServicioAutocompletar contrAuto = new ServicioAutocompletar(mUtilServicios, mLoggingService, mEntityContext, mConfigService, mServicesUtilVirtuosoAndReplication);
+                    ServicioAutocompletar contrAuto = new ServicioAutocompletar(mUtilServicios, mLoggingService, mEntityContext, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<ServicioAutocompletar>(), mLoggerFactory);
                     Dictionary<Guid, string> resultadosFacetas = contrAuto.RealizarConsulta(q, identidadID, proyectoID);
 
                     foreach (Guid identidadResultadosID in resultadosFacetas.Keys)
@@ -1261,8 +1253,8 @@ namespace Gnoss.Web.AutoComplete
 
             Guid proyectoID = new Guid(proyecto);
 
-            IdentidadCN identidadCN = new IdentidadCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication);
-            IdentidadCL identidadCL = new IdentidadCL(mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mServicesUtilVirtuosoAndReplication);
+            IdentidadCN identidadCN = new IdentidadCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<IdentidadCN>(), mLoggerFactory);
+            IdentidadCL identidadCL = new IdentidadCL(mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<IdentidadCL>(), mLoggerFactory);
             DataWrapperIdentidad idenDW = new DataWrapperIdentidad();
             DataWrapperAmigos amigosDW = new DataWrapperAmigos();
 
@@ -1273,7 +1265,7 @@ namespace Gnoss.Web.AutoComplete
             }
             else
             {
-                AmigosCL amigosCL = new AmigosCL(mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mServicesUtilVirtuosoAndReplication);
+                AmigosCL amigosCL = new AmigosCL(mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<AmigosCL>(), mLoggerFactory);
 
                 if (!amigosCL.ObtenerAmigos(identidadMyGnossID, idenDW, null, null, amigosDW, identidadOrganizacionID == identidadID, false))
                 {
@@ -1319,7 +1311,7 @@ namespace Gnoss.Web.AutoComplete
             }
 
             #region GRUPOS
-            
+
             DataWrapperIdentidad idenDSGruposProyectos = identidadCN.ObtenerGruposEnvios(identidadMyGnossID);
             identidadCN.Dispose();
             List<Es.Riam.Gnoss.AD.EntityModel.Models.IdentidadDS.GrupoIdentidades> grupos = idenDSGruposProyectos.ListaGrupoIdentidades.Where(item => UtilCadenas.RemoveAccentsWithRegEx(q).Trim().Contains(item.Nombre.Trim())).ToList();
@@ -1369,7 +1361,7 @@ namespace Gnoss.Web.AutoComplete
             {
                 try
                 {
-                    ServicioAutocompletar contrAuto = new ServicioAutocompletar(mUtilServicios, mLoggingService, mEntityContext, mConfigService, mServicesUtilVirtuosoAndReplication);
+                    ServicioAutocompletar contrAuto = new ServicioAutocompletar(mUtilServicios, mLoggingService, mEntityContext, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<ServicioAutocompletar>(), mLoggerFactory);
                     Dictionary<Guid, string> resultadosFacetas = contrAuto.RealizarConsulta(q, identidadID, proyectoID);
 
                     foreach (Guid identidadResultadosID in resultadosFacetas.Keys)
@@ -1424,7 +1416,7 @@ namespace Gnoss.Web.AutoComplete
                 Guid organizacionID;
                 Guid proyectoID;
 
-                ProyectoCN proyCN = new ProyectoCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication);
+                ProyectoCN proyCN = new ProyectoCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<ProyectoCN>(), mLoggerFactory);
                 proyCN.ObtenerDatosPorBaseRecursosPersona(new Guid(baseRecursosID), new Guid(personaID), out proyectoID, out identidadID, out organizacionID);
 
                 proyecto = proyectoID.ToString();
@@ -1455,7 +1447,7 @@ namespace Gnoss.Web.AutoComplete
 
         [HttpPost]
         [Route("AutoCompletarLectoresEditores")]
-        public IActionResult AutoCompletarLectoresEditores([FromForm]string q, [FromForm] string lista, [FromForm] string identidad, [FromForm] string organizacion, [FromForm] string proyecto, [FromForm] string bool_edicion, [FromForm] string bool_traergrupos, [FromForm] string grupo, [FromForm] string bool_traerperfiles)
+        public IActionResult AutoCompletarLectoresEditores([FromForm] string q, [FromForm] string lista, [FromForm] string identidad, [FromForm] string organizacion, [FromForm] string proyecto, [FromForm] string bool_edicion, [FromForm] string bool_traergrupos, [FromForm] string grupo, [FromForm] string bool_traerperfiles)
         {
             short traerDatos = 0;//Todo
 
@@ -1473,6 +1465,18 @@ namespace Gnoss.Web.AutoComplete
 
             return Ok(respuesta);
         }
+
+        /// <summary>
+        /// Autocompletar para el buscador de administracion matomo
+        /// </summary>
+        /// <param name="q">Nombre de perfil a buscar</param>
+        /// <returns></returns>
+        [HttpPost]
+        [Route("AutoCompletarSeleccionUsuariosMatomo")]
+        public IActionResult AutoCompletarSeleccionUsuariosMatomo([FromForm] string q)
+        {
+            return Ok(AutoCompletarUsuariosMatomosInt(q, 10));
+        }
         /// <summary>
         /// Autocompletar para la edición/creación de un recurso, para las ontologias
         /// </summary>
@@ -1483,7 +1487,7 @@ namespace Gnoss.Web.AutoComplete
         /// <returns></returns>
         [HttpPost]
         [Route("AutoCompletarOntologia")]
-        public IActionResult AutoCompletarOntologia([FromForm]string q, [FromForm] string lista, [FromForm] string identidad, [FromForm] string organizacion, [FromForm] string proyecto)
+        public IActionResult AutoCompletarOntologia([FromForm] string q, [FromForm] string lista, [FromForm] string identidad, [FromForm] string organizacion, [FromForm] string proyecto)
         {
             string respuesta = ObtenerPropiedadesOntologia(q, lista, identidad, organizacion, proyecto);
 
@@ -1519,9 +1523,9 @@ namespace Gnoss.Web.AutoComplete
         /// <returns></returns>
         [HttpPost]
         [Route("AutocompletarMiembrosOrganizacion")]
-        public IActionResult AutocompletarMiembrosOrganizacion([FromForm]string q, [FromForm] string lista, [FromForm] string identidad, [FromForm] string organizacion, [FromForm] string grupo)
+        public IActionResult AutocompletarMiembrosOrganizacion([FromForm] string q, [FromForm] string lista, [FromForm] string identidad, [FromForm] string organizacion, [FromForm] string grupo)
         {
-            if(lista == null) { lista = ""; }
+            if (lista == null) { lista = ""; }
             string[] arrayAnteriores = lista.Split(',');
             List<string> listaAnteriores = new List<string>();
             //Recorro el array para limpiar los espacios vacios.
@@ -1538,7 +1542,7 @@ namespace Gnoss.Web.AutoComplete
 
             Guid organizacionID = new Guid(organizacion);
 
-            IdentidadCL identidadCL = new IdentidadCL(mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mServicesUtilVirtuosoAndReplication);
+            IdentidadCL identidadCL = new IdentidadCL(mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<IdentidadCL>(), mLoggerFactory);
             DataWrapperIdentidad idenDW = new DataWrapperIdentidad();
 
             //TODO: Comprobar que la identidad pertenece al proyecto
@@ -1629,10 +1633,10 @@ namespace Gnoss.Web.AutoComplete
 
             Guid proyectoID = new Guid(proyecto);
 
-            IdentidadCL identidadCL = new IdentidadCL(mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mServicesUtilVirtuosoAndReplication);
+            IdentidadCL identidadCL = new IdentidadCL(mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<IdentidadCL>(), mLoggerFactory);
             DataWrapperIdentidad idenDW = new DataWrapperIdentidad();
             DataWrapperAmigos dataWrapperAmigos = new DataWrapperAmigos();
-            AmigosCL amigosCL = new AmigosCL(mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mServicesUtilVirtuosoAndReplication);
+            AmigosCL amigosCL = new AmigosCL(mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<AmigosCL>(), mLoggerFactory);
 
             if (!amigosCL.ObtenerAmigos(identidadMyGnossID, idenDW, null, null, dataWrapperAmigos, identidadOrganizacionID == identidadID, false))
             {
@@ -1660,7 +1664,7 @@ namespace Gnoss.Web.AutoComplete
 
             // IdentidadDS identMiembrosDS = identidadCL.ObtenerMiembrosComunidad(proyectoID);
 
-            IdentidadCN identCN = new IdentidadCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication);
+            IdentidadCN identCN = new IdentidadCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<IdentidadCN>(), mLoggerFactory);
 
             foreach (Es.Riam.Gnoss.AD.EntityModel.Models.IdentidadDS.Perfil perfil in perfiles)
             {
@@ -1732,7 +1736,7 @@ namespace Gnoss.Web.AutoComplete
 
             DataWrapperIdentidad idenDW = new DataWrapperIdentidad();
             DataWrapperAmigos dataWrapperAmigos = new DataWrapperAmigos();
-            AmigosCL amigosCL = new AmigosCL(mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mServicesUtilVirtuosoAndReplication);
+            AmigosCL amigosCL = new AmigosCL(mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<AmigosCL>(), mLoggerFactory);
 
             if (!amigosCL.ObtenerAmigos(identidadMyGnossID, idenDW, null, null, dataWrapperAmigos, identidadOrganizacionID == identidadID, false))
             {
@@ -1741,7 +1745,7 @@ namespace Gnoss.Web.AutoComplete
             }
             amigosCL.Dispose();
 
-            IdentidadCL identidadCL = new IdentidadCL(mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mServicesUtilVirtuosoAndReplication);
+            IdentidadCL identidadCL = new IdentidadCL(mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<IdentidadCL>(), mLoggerFactory);
             DataWrapperIdentidad identMiembrosDW = identidadCL.ObtenerMiembrosGnossVisibles();
             identidadCL.Dispose();
 
@@ -1817,7 +1821,7 @@ namespace Gnoss.Web.AutoComplete
 
             DataWrapperIdentidad idenDW = new DataWrapperIdentidad();
             DataWrapperAmigos amigosDW = new DataWrapperAmigos();
-            AmigosCL amigosCL = new AmigosCL(mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mServicesUtilVirtuosoAndReplication);
+            AmigosCL amigosCL = new AmigosCL(mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<AmigosCL>(), mLoggerFactory);
 
 
             //amigosDS = amigosCN.ObtenerAmigosDeIdentidad(identidadID);
@@ -1944,7 +1948,7 @@ namespace Gnoss.Web.AutoComplete
 
             Guid proyectoID = new Guid(proyecto);
 
-            IdentidadCN identidadCN = new IdentidadCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication);
+            IdentidadCN identidadCN = new IdentidadCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<IdentidadCN>(), mLoggerFactory);
             DataWrapperIdentidad dataWrapperIdentidad = identidadCN.ObtenerGruposDeProyecto(proyectoID, false);
             identidadCN.Dispose();
 
@@ -1996,7 +2000,7 @@ namespace Gnoss.Web.AutoComplete
                 pArgumentos = LimpiarComillasSimples(pArgumentos);
 
                 //Obtener el DS con los datosextraproyecto
-                ProyectoCN proyectoCN = new ProyectoCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication);
+                ProyectoCN proyectoCN = new ProyectoCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<ProyectoCN>(), mLoggerFactory);
                 DataWrapperProyecto datosExtraProyectoDW = proyectoCN.ObtenerDatosExtraProyectoPorID(new Guid(pProyectoID));
                 proyectoCN.Dispose();
 
@@ -2024,7 +2028,7 @@ namespace Gnoss.Web.AutoComplete
 
                     if (!string.IsNullOrEmpty(queryVirtuoso))
                     {
-                        FacetadoCN facCN = new FacetadoCN("acid", UrlIntragnoss, mEntityContext, mLoggingService, mConfigService, mVirtuosoAD, mServicesUtilVirtuosoAndReplication);
+                        FacetadoCN facCN = new FacetadoCN("acid", UrlIntragnoss, mEntityContext, mLoggingService, mConfigService, mVirtuosoAD, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<FacetadoCN>(), mLoggerFactory);
                         FacetadoDS facetadoDS = facCN.LeerDeVirtuoso(queryVirtuoso, "aaa", "");
                         facCN.Dispose();
 
@@ -2101,14 +2105,14 @@ namespace Gnoss.Web.AutoComplete
                     Guid identidadID = Guid.Empty;
                     if (Guid.TryParse(proyecto, out proyectoID) && !proyectoID.Equals(Guid.Empty))
                     {
-                        ProyectoCN proyCN = new ProyectoCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication);
+                        ProyectoCN proyCN = new ProyectoCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<ProyectoCN>(), mLoggerFactory);
                         List<Guid> identidadesSupervisores = proyCN.ObtenerListaIdentidadesSupervisoresPorProyecto(proyectoID);
                         proyCN.Dispose();
 
                         //Obtenemos los perfiles relacionados con la búsqueda
                         string busq = UtilCadenas.RemoveAccentsWithRegEx(q);
                         Dictionary<Guid, Tuple<string, string, Guid?, Guid?>> listaPerfilesBusqueda = new Dictionary<Guid, Tuple<string, string, Guid?, Guid?>>();
-                        IdentidadCN identCN = new IdentidadCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication);
+                        IdentidadCN identCN = new IdentidadCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<IdentidadCN>(), mLoggerFactory);
                         listaPerfilesBusqueda = identCN.ObtenerPerfilesParaAutocompletarDeIdentidadesID(identidadesSupervisores, proyectoID, identidadID, busq, 10, true);
                         //como sólo se muestran 10 no necesito traer más perfiles
                         identCN.Dispose();
@@ -2155,6 +2159,30 @@ namespace Gnoss.Web.AutoComplete
 
             return Ok(resultados);
         }
+
+        [HttpPost]
+		[Route("AutocompletarNombresProyectos")]
+		public IActionResult AutocompletarNombresProyectos([FromForm] string q)
+        {
+            string resultados = "";
+            try
+            {
+                ProyectoCN proyCN = new ProyectoCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<ProyectoCN>(), mLoggerFactory);
+                List<string> listaNombres = proyCN.ObtenerNombresDeProyectoPorBusquedaAutocompletar(q);
+                foreach (string nombreProyecto in listaNombres)
+                {
+                    resultados += nombreProyecto;
+                    resultados += Environment.NewLine;
+				}
+            }
+            catch (Exception ex)
+            {
+                mLoggingService.GuardarLogError(ex, $"Error al obtener los proyectos para la consulta: '{q}'",mlogger);
+            }
+
+            return Ok(resultados);
+        }
+
         [NonAction]
         private string LimpiarComillasSimples(string pParametro)
         {
@@ -2198,7 +2226,7 @@ namespace Gnoss.Web.AutoComplete
         [NonAction]
         private string ObtenerPaisPorID(Guid paisID)
         {
-            PaisCL paisCL = new PaisCL(mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mServicesUtilVirtuosoAndReplication);
+            PaisCL paisCL = new PaisCL(mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<PaisCL>(), mLoggerFactory);
             DataWrapperPais paisDW = paisCL.ObtenerPaisesProvincias();
 
             string paisTexto = "";
@@ -2229,7 +2257,7 @@ namespace Gnoss.Web.AutoComplete
             {
                 if (string.IsNullOrEmpty(mUrlIntragnoss))
                 {
-                    ParametroAplicacionCL paramCL = new ParametroAplicacionCL(mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mServicesUtilVirtuosoAndReplication);
+                    ParametroAplicacionCL paramCL = new ParametroAplicacionCL(mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<ParametroAplicacionCL>(), mLoggerFactory);
                     List<ParametroAplicacion> parametrosAplicacion = paramCL.ObtenerParametrosAplicacionPorContext();
                     mUrlIntragnoss = parametrosAplicacion.Find(parametroApp => parametroApp.Parametro.Equals("UrlIntragnoss")).Valor;
                 }
@@ -2244,7 +2272,7 @@ namespace Gnoss.Web.AutoComplete
             {
                 if (!mCargarIdentidadesDeProyectosPrivadosComoAmigos.HasValue)
                 {
-                    ParametroAplicacionCL paramCL = new ParametroAplicacionCL(mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mServicesUtilVirtuosoAndReplication);
+                    ParametroAplicacionCL paramCL = new ParametroAplicacionCL(mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<ParametroAplicacionCL>(), mLoggerFactory);
                     List<ParametroAplicacion> parametrosAplicacion = paramCL.ObtenerParametrosAplicacionPorContext();
                     List<ParametroAplicacion> parametrosAplicacionPrivAmigos = parametrosAplicacion.Where(parametroApp => parametroApp.Parametro.Equals(TiposParametrosAplicacion.CargarIdentidadesDeProyectosPrivadosComoAmigos)).ToList();
                     mCargarIdentidadesDeProyectosPrivadosComoAmigos = parametrosAplicacionPrivAmigos.Count > 0 && (parametrosAplicacionPrivAmigos[0].Equals("1") || parametrosAplicacionPrivAmigos[0].Valor.ToString().ToLower().Equals("true"));
@@ -2278,7 +2306,7 @@ namespace Gnoss.Web.AutoComplete
         {
             mListaItemsExtra = new List<string>();
             Guid auxId;
-            if(tipo == null)
+            if (tipo == null)
             {
                 tipo = "";
             }
@@ -2286,7 +2314,7 @@ namespace Gnoss.Web.AutoComplete
             if (tipo.Equals("Recurso") || tipo.Equals("Meta") || tipo.Equals("") || (Guid.TryParse(tipo, out auxId) && !auxId.Equals(Guid.Empty)))
             {
                 //ObtenerOntologias
-                FacetaCL tablasDeConfiguracionCL = new FacetaCL(mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mServicesUtilVirtuosoAndReplication);
+                FacetaCL tablasDeConfiguracionCL = new FacetaCL(mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<FacetaCL>(), mLoggerFactory);
                 mTConfiguracionOntologia = new DataWrapperFacetas();
                 Guid orgID = Guid.Empty;
                 if (!string.IsNullOrEmpty(organizacion))
@@ -2317,7 +2345,7 @@ namespace Gnoss.Web.AutoComplete
         {
             mPropiedadesRango = new List<string>();
 
-            FacetaCL facetaCL = new FacetaCL(mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mServicesUtilVirtuosoAndReplication);
+            FacetaCL facetaCL = new FacetaCL(mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<FacetaCL>(), mLoggerFactory);
             List<Faceta> lista = pGestorFacetas.ListaFacetas.Where(faceta => faceta.TipoPropiedad.Equals(TipoPropiedadFaceta.Numero)).ToList();
 
             foreach (Faceta fac in lista)
@@ -2349,7 +2377,7 @@ namespace Gnoss.Web.AutoComplete
         private List<string> CargarPropiedadesFecha(GestionFacetas pGestorFacetas)
         {
             mPropiedadesFecha = new List<string>();
-            FacetaCL facetaCL = new FacetaCL(mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mServicesUtilVirtuosoAndReplication);
+            FacetaCL facetaCL = new FacetaCL(mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<FacetaCL>(), mLoggerFactory);
             List<Faceta> lista = pGestorFacetas.ListaFacetas.Where(faceta => faceta.TipoPropiedad.Equals(TipoPropiedadFaceta.Fecha)).ToList();
 
             foreach (Faceta fac in lista)
@@ -2399,8 +2427,8 @@ namespace Gnoss.Web.AutoComplete
             {
                 if (mGestorFacetas == null)
                 {
-                    FacetaCL facetaCL = new FacetaCL(mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mServicesUtilVirtuosoAndReplication);
-                    mGestorFacetas = new GestionFacetas(facetaCL.ObtenerFacetasDeProyecto(null, ProyectoID, false), mLoggingService);
+                    FacetaCL facetaCL = new FacetaCL(mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<FacetaCL>(), mLoggerFactory);
+                    mGestorFacetas = new GestionFacetas(facetaCL.ObtenerFacetasDeProyecto(null, ProyectoID, false));
                 }
                 return mGestorFacetas;
             }
@@ -2437,7 +2465,7 @@ namespace Gnoss.Web.AutoComplete
             {
                 if (mParametroProyecto == null)
                 {
-                    ProyectoCL proyectoCL = new ProyectoCL(mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mVirtuosoAD, mServicesUtilVirtuosoAndReplication);
+                    ProyectoCL proyectoCL = new ProyectoCL(mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mVirtuosoAD, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<ProyectoCL>(), mLoggerFactory);
                     mParametroProyecto = proyectoCL.ObtenerParametrosProyecto(ProyectoID);
                     proyectoCL.Dispose();
                 }
@@ -2488,7 +2516,7 @@ namespace Gnoss.Web.AutoComplete
 
             Guid proyectoID = new Guid(proyecto);
 
-            IdentidadCL identidadCL = new IdentidadCL(mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mServicesUtilVirtuosoAndReplication);
+            IdentidadCL identidadCL = new IdentidadCL(mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<IdentidadCL>(), mLoggerFactory);
             DataWrapperIdentidad idenDS = new DataWrapperIdentidad();
             List<Guid> listaPerAnterioresID = null;
 
@@ -2501,7 +2529,7 @@ namespace Gnoss.Web.AutoComplete
                     listaUsuID.Add(new Guid(usuID));
                 }
 
-                PersonaCN personaCN = new PersonaCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication);
+                PersonaCN personaCN = new PersonaCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<PersonaCN>(), mLoggerFactory);
                 Dictionary<Guid, Guid> usuPerID = personaCN.ObtenerPersonasIDDeUsuariosID(listaUsuID);
                 personaCN.Dispose();
 
@@ -2512,8 +2540,8 @@ namespace Gnoss.Web.AutoComplete
             // string busq = UtilCadenas.RemoveAccentsWithRegEx(q);
 
             string busq = q;
-            IdentidadCN identidadCN = new IdentidadCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication);
-            ProyectoCN proyectoCN = new ProyectoCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication);
+            IdentidadCN identidadCN = new IdentidadCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<IdentidadCN>(), mLoggerFactory);
+            ProyectoCN proyectoCN = new ProyectoCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<ProyectoCN>(), mLoggerFactory);
 
             //Obtenemos los perfiles
             Dictionary<Guid, Tuple<string, string, Guid?, Guid?>> listaPerfilesBusqueda = new Dictionary<Guid, Tuple<string, string, Guid?, Guid?>>();
@@ -2523,13 +2551,13 @@ namespace Gnoss.Web.AutoComplete
                 listaPerfilesBusqueda = identidadCN.ObtenerPerfilesParaAutocompletar(proyectoID, identidadID, busq, 30, !esEdicion);
             }
 
-            DataWrapperIdentidad dwIdentidad = null;            
+            DataWrapperIdentidad dwIdentidad = null;
             if (traerDatos == 0 || traerDatos == 1 || traerDatos == 3)
             {
                 // Obtenemos las organizaciones que administra el usuario
-                UsuarioCN usuarioCN = new UsuarioCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication);
-                Guid usuarioID = usuarioCN.ObtenerGuidUsuarioIDporIdentidadID(identidadID);          
-                OrganizacionCN organizacionCN = new OrganizacionCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication);
+                UsuarioCN usuarioCN = new UsuarioCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<UsuarioCN>(), mLoggerFactory);
+                Guid usuarioID = usuarioCN.ObtenerGuidUsuarioIDporIdentidadID(identidadID);
+                OrganizacionCN organizacionCN = new OrganizacionCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<OrganizacionCN>(), mLoggerFactory);
                 List<Guid> organizacionesAdministradasUsuario = usuarioCN.ObtenerOrganizacionesAdministradasPorUsuario(usuarioID);
                 // Obtenemos los usuarios que pertenecen a la organización y a esta comunidad
                 dwIdentidad = identidadCN.ObtenerIdentidadesDeOrganizaciones(organizacionesAdministradasUsuario, proyectoID);
@@ -2537,7 +2565,7 @@ namespace Gnoss.Web.AutoComplete
                 usuarioCN.Dispose();
                 organizacionCN.Dispose();
             }
-            
+
             //Obtenemos los grupos
             Dictionary<Guid, string> listaGruposBusqueda = new Dictionary<Guid, string>();
             if (traerDatos == 0 || traerDatos == 2)
@@ -2577,7 +2605,7 @@ namespace Gnoss.Web.AutoComplete
                 gestorIdentidades.Dispose();
                 gestorIdentidades = null;
             }
-      
+
             proyectoCN.Dispose();
 
 
@@ -2619,7 +2647,7 @@ namespace Gnoss.Web.AutoComplete
 
             if (dwIdentidad != null)
             {
-                PersonaCN personaCN = new PersonaCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication);
+                PersonaCN personaCN = new PersonaCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<PersonaCN>(), mLoggerFactory);
                 foreach (Es.Riam.Gnoss.AD.EntityModel.Models.IdentidadDS.Perfil perfil in dwIdentidad.ListaPerfil)
                 {
                     if (!listaPerfiles.ContainsKey(perfil.PerfilID) && (perfil.NombrePerfil.ToLower().Contains(busq.ToLower()) || perfil.NombrePerfil.ToLower().StartsWith(busq.ToLower())))
@@ -2655,7 +2683,7 @@ namespace Gnoss.Web.AutoComplete
             {
                 foreach (Es.Riam.Gnoss.AD.EntityModel.Models.IdentidadDS.GrupoIdentidades filaGrupo in gruposOrgBusqueda)
                 {
-                    OrganizacionCN orgCN = new OrganizacionCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication);
+                    OrganizacionCN orgCN = new OrganizacionCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<OrganizacionCN>(), mLoggerFactory);
                     string nombreOrg = orgCN.ObtenerNombreOrganizacionPorID(organizacionID).Nombre;
 
                     string nombreGrupo = filaGrupo.Nombre + " " + ConstantesDeSeparacion.SEPARACION_CONCATENADOR + " " + nombreOrg;
@@ -2675,7 +2703,7 @@ namespace Gnoss.Web.AutoComplete
 
             if (traerDatos == 3)
             {
-                PersonaCN personaCN = new PersonaCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication);
+                PersonaCN personaCN = new PersonaCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<PersonaCN>(), mLoggerFactory);
                 Dictionary<Guid, KeyValuePair<Guid, string>> perUsuID = personaCN.ObtenerUsuariosIDYDNIsDePersonasID(new List<Guid>(listaPerfiles.Keys));
                 personaCN.Dispose();
 
@@ -2714,21 +2742,51 @@ namespace Gnoss.Web.AutoComplete
 
             return resultados;
         }
+        /// <summary>
+        /// Autocompletar para el buscador de administracion matomo
+        /// </summary>
+        /// <param name="pNombrePerfil">Nombre a buscar</param>
+        /// <param name="pNumero">Numero de resultados a devolver</param>
+        /// <returns></returns>
+        [NonAction]
+        public string AutoCompletarUsuariosMatomosInt(string pNombrePerfil, int pNumero)
+        {
+            Dictionary<Guid, string> listaUsuariosIDBusqueda = new Dictionary<Guid, string>();
+            UsuarioCN usuarioCN = new UsuarioCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<UsuarioCN>(), mLoggerFactory);
+            listaUsuariosIDBusqueda = usuarioCN.ObtenerUsuariosIDParaAutocompletar(pNombrePerfil, pNumero);
+            usuarioCN.Dispose();
+            string resultados = "";
+            foreach (Guid clave in listaUsuariosIDBusqueda.Keys)
+            {
+                resultados += $"{listaUsuariosIDBusqueda[clave]}|{clave}";
+                resultados += Environment.NewLine;
+            }
+
+            return resultados;
+        }
 
         private ControladorDocumentacion mControladorDocumentacion;
         private ControladorDocumentacion ControladorDocumentacion
         {
             get
             {
-                if(mControladorDocumentacion == null)
+                if (mControladorDocumentacion == null)
                 {
-                    mControladorDocumentacion = new ControladorDocumentacion(mLoggingService, mEntityContext, mConfigService, mRedisCacheWrapper, mGnossCache, mEntityContextBASE, mVirtuosoAD, mHttpContextAccessor, mServicesUtilVirtuosoAndReplication);
+                    mControladorDocumentacion = new ControladorDocumentacion(mLoggingService, mEntityContext, mConfigService, mRedisCacheWrapper, mGnossCache, mEntityContextBASE, mVirtuosoAD, mHttpContextAccessor, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<ControladorDocumentacion>(), mLoggerFactory);
                 }
                 return mControladorDocumentacion;
             }
         }
 
-        
+        /// <summary>
+        /// Deprecated
+        /// </summary>
+        /// <param name="q"> Sentencia a autocompletar</param>
+        /// <param name="lista"></param>
+        /// <param name="identidad"></param>
+        /// <param name="organizacion"></param>
+        /// <param name="proyecto"></param>
+        /// <returns></returns>
         [NonAction]
         private string ObtenerPropiedadesOntologia(string q, string lista, string identidad, string organizacion, string proyecto)
         {
@@ -2756,7 +2814,7 @@ namespace Gnoss.Web.AutoComplete
             Guid proyectoID = new Guid(proyecto);
 
             DataWrapperDocumentacion dataWrapperDocumentacion = new DataWrapperDocumentacion();
-            DocumentacionCN docCN = new DocumentacionCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication);
+            DocumentacionCN docCN = new DocumentacionCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<DocumentacionCN>(), mLoggerFactory);
             docCN.ObtenerOntologiasProyecto(proyectoID, dataWrapperDocumentacion, false, false, true);
             docCN.Dispose();
 
@@ -2790,26 +2848,17 @@ namespace Gnoss.Web.AutoComplete
                 }
             }
             string resultados = "";
-            List<string> listaFinal = new List<string>();
-            if (q.Contains("@@@"))
-            {
-                string[] trozos = Regex.Split(q, @"(?=@@@)");
-                if (!trozos[trozos.Length - 1].EndsWith("@"))
-                {
-                    string[] trozos2 = trozos[trozos.Length - 1].Split('@');
-                    listaFinal = nombresDatatypeProperty.Where(item => item.ToLower().Contains(trozos2[trozos2.Length - 1])).Union(nombresObjectProperty.Where(item => item.ToLower().Contains(trozos2[trozos2.Length - 1]))).ToList();
-                }//q.Split('@');               
-            }
-            else
-            {
-                listaFinal = nombresDatatypeProperty.Where(item => item.ToLower().Contains(q)).Union(nombresObjectProperty.Where(item => item.ToLower().Contains(q))).ToList();
-            }
+            List<string> opcionesAutocompletado = new List<string>();
 
-			listaFinal.AddRange(PropiedadesOntologiasBasicas.Where(item => item.ToLower().Contains(q)));
+            String propertyName = q.Split("@@@").Last();
 
-			for (int i = 0; i < listaFinal.Count; i++)
+            opcionesAutocompletado = nombresDatatypeProperty.Where(item => item.ToLower().Contains(propertyName)).Union(nombresObjectProperty.Where(item => item.ToLower().Contains(propertyName))).ToList();
+            opcionesAutocompletado.AddRange(PropiedadesOntologiasBasicas.Where(item => item.ToLower().Contains(propertyName)));
+
+
+            for (int i = 0; i < opcionesAutocompletado.Count; i++)
             {
-                resultados += listaFinal[i];
+                resultados += opcionesAutocompletado[i];
                 resultados += Environment.NewLine;
             }
             return resultados;
@@ -2829,9 +2878,13 @@ namespace Gnoss.Web.AutoComplete
                 {
                     string[] filtro = args[i].Split(separadores, StringSplitOptions.RemoveEmptyEntries);
                     string key = filtro[0];
+                    if (!key.Contains(":") && !key.Contains(";") && !key.StartsWith("http") && key.ToLower() != "search")
+                    {
+                        continue;
+                    }
                     if (!listaFiltros.ContainsKey(key))
                     {
-                        listaFiltros.Add(key, new List<string>());
+                        listaFiltros.TryAdd(key, new List<string>());
                     }
                     listaFiltros[key].Add(filtro[1]);
                 }
