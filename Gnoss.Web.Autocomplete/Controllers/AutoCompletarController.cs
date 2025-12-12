@@ -2712,13 +2712,15 @@ namespace Gnoss.Web.AutoComplete
                 foreach (Guid clave in listaPerfiles.Keys)
                 {
                     string extraDNI = "";
-
-                    if (!string.IsNullOrEmpty(perUsuID[clave].Value))
+                    if (perUsuID.ContainsKey(clave))
                     {
-                        extraDNI = " - " + perUsuID[clave].Value;
-                    }
+                        if (!string.IsNullOrEmpty(perUsuID[clave].Value))
+                        {
+                            extraDNI = " - " + perUsuID[clave].Value;
+                        }
 
-                    listaPerfilesAux.Add(perUsuID[clave].Key, listaPerfiles[clave] + extraDNI);
+                        listaPerfilesAux.Add(perUsuID[clave].Key, listaPerfiles[clave] + extraDNI);
+                    }
                 }
 
                 listaPerfiles = listaPerfilesAux;
@@ -2742,6 +2744,7 @@ namespace Gnoss.Web.AutoComplete
 
             return resultados;
         }
+
         /// <summary>
         /// Autocompletar para el buscador de administracion matomo
         /// </summary>
