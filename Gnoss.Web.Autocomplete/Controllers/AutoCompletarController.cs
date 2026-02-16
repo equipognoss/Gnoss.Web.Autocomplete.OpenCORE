@@ -51,6 +51,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion.Internal;
 using Es.Riam.Interfaces.InterfacesOpen;
 using Microsoft.Extensions.Logging;
 using Serilog.Core;
+using System.Text;
 
 namespace Gnoss.Web.AutoComplete
 {
@@ -2345,12 +2346,11 @@ namespace Gnoss.Web.AutoComplete
         {
             mPropiedadesRango = new List<string>();
 
-            FacetaCL facetaCL = new FacetaCL(mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<FacetaCL>(), mLoggerFactory);
             List<Faceta> lista = pGestorFacetas.ListaFacetas.Where(faceta => faceta.TipoPropiedad.Equals(TipoPropiedadFaceta.Numero)).ToList();
 
-            foreach (Faceta fac in lista)
+            foreach (string claveFaceta in lista.Select(item => item.ClaveFaceta))
             {
-                mPropiedadesRango.Add(fac.ClaveFaceta.Substring(fac.ClaveFaceta.LastIndexOf(":") + 1));
+                mPropiedadesRango.Add(claveFaceta.Substring(claveFaceta.LastIndexOf(":") + 1));
             }
 
             return mPropiedadesRango;
@@ -2517,7 +2517,6 @@ namespace Gnoss.Web.AutoComplete
             Guid proyectoID = new Guid(proyecto);
 
             IdentidadCL identidadCL = new IdentidadCL(mEntityContext, mLoggingService, mRedisCacheWrapper, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<IdentidadCL>(), mLoggerFactory);
-            DataWrapperIdentidad idenDS = new DataWrapperIdentidad();
             List<Guid> listaPerAnterioresID = null;
 
             if (traerDatos == 3)
@@ -2535,9 +2534,6 @@ namespace Gnoss.Web.AutoComplete
 
                 listaPerAnterioresID = new List<Guid>(usuPerID.Values);
             }
-
-
-            // string busq = UtilCadenas.RemoveAccentsWithRegEx(q);
 
             string busq = q;
             IdentidadCN identidadCN = new IdentidadCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<IdentidadCN>(), mLoggerFactory);
@@ -2603,7 +2599,6 @@ namespace Gnoss.Web.AutoComplete
                 listaPerfilesBusqueda = listaPerfilesBusqueda.Where(p => !listaPerfilesGrupoBusqueda.Contains(p.Key)).ToDictionary(p => p.Key, p => p.Value);
 
                 gestorIdentidades.Dispose();
-                gestorIdentidades = null;
             }
 
             proyectoCN.Dispose();
@@ -2646,8 +2641,7 @@ namespace Gnoss.Web.AutoComplete
             }
 
             if (dwIdentidad != null)
-            {
-                PersonaCN personaCN = new PersonaCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<PersonaCN>(), mLoggerFactory);
+            {                
                 foreach (Es.Riam.Gnoss.AD.EntityModel.Models.IdentidadDS.Perfil perfil in dwIdentidad.ListaPerfil)
                 {
                     if (!listaPerfiles.ContainsKey(perfil.PerfilID) && (perfil.NombrePerfil.ToLower().Contains(busq.ToLower()) || perfil.NombrePerfil.ToLower().StartsWith(busq.ToLower())))
@@ -2726,23 +2720,22 @@ namespace Gnoss.Web.AutoComplete
                 listaPerfiles = listaPerfilesAux;
             }
 
-            string resultados = "";
+            StringBuilder resultados = new StringBuilder();
             foreach (Guid clave in listaPerfiles.Keys)
             {
-                resultados += listaPerfiles[clave] + "|" + clave;
-                resultados += Environment.NewLine;
+                resultados.AppendLine($"{listaPerfiles[clave]}|{clave}");
             }
 
             foreach (Guid clave in listaGrupos.Keys)
             {
-                resultados += listaGrupos[clave] + "|g_" + clave;
-                resultados += Environment.NewLine;
+                resultados.AppendLine($"{listaGrupos[clave]}|g_{clave}");
             }
+
             #endregion
 
             identidadCN.Dispose();
 
-            return resultados;
+            return resultados.ToString();
         }
 
         /// <summary>
