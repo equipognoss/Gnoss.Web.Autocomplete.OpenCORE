@@ -9,13 +9,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl
 
 WORKDIR /app
 
-COPY Gnoss.Web.Autocomplete/*.csproj ./
-
-RUN dotnet restore
-
 COPY . ./
 
-RUN dotnet publish Gnoss.Web.Autocomplete/Gnoss.Web.Autocomplete.csproj -c Release -o out
+RUN dotnet restore Gnoss.Web.Autocomplete.OpenCORE/Gnoss.Web.Autocomplete/Gnoss.Web.Autocomplete.csproj
+
+RUN dotnet publish Gnoss.Web.Autocomplete.OpenCORE/Gnoss.Web.Autocomplete/Gnoss.Web.Autocomplete.csproj -c Release -o out
 
 FROM mcr.microsoft.com/dotnet/aspnet:8.0
 
