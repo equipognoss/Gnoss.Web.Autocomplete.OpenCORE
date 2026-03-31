@@ -50,21 +50,13 @@ namespace Gnoss.Web.AutoComplete
         public void ConfigureServices(IServiceCollection services)
 
         {
-			ILoggerFactory loggerFactory =
-			LoggerFactory.Create(builder =>
-			{
-				builder.AddConfiguration(Configuration.GetSection("Logging"));
-				builder.AddSimpleConsole(options =>
-				{
-					options.IncludeScopes = true;
-					options.SingleLine = true;
-					options.TimestampFormat = "yyyy-MM-dd HH:mm:ss ";
-					options.UseUtcTimestamp = true;
-				});
-			});
+            LoggingService.ConfigurarLogging(services, Configuration);
 
-			services.AddSingleton(loggerFactory);
-			services.AddCors(options =>
+            // Provider temporal solo para el logger de arranque
+            using var tempProvider = services.BuildServiceProvider();
+            var loggerFactory = tempProvider.GetRequiredService<ILoggerFactory>();
+
+            services.AddCors(options =>
             {
                 options.AddPolicy(name: "_myAllowSpecificOrigins",
                                   builder =>
@@ -132,11 +124,6 @@ namespace Gnoss.Web.AutoComplete
 
             BaseCL.UsarCacheLocal = UsoCacheLocal.Siempre;
 
-            string configLogStash = configService.ObtenerLogStashConnection();
-            if (!string.IsNullOrEmpty(configLogStash))
-            {
-                LoggingService.InicializarLogstash(configLogStash);
-            }
             var loggingService = sp.GetService<LoggingService>();
             var entity = sp.GetService<EntityContext>();
 			var redisCacheWrapper = sp.GetService<RedisCacheWrapper>();
