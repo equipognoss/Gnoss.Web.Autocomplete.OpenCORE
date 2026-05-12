@@ -768,6 +768,7 @@ namespace Gnoss.Web.AutoComplete
                 {
                     DocumentacionCN docCN = new DocumentacionCN(mEntityContext, mLoggingService, mConfigService, mServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<DocumentacionCN>(), mLoggerFactory);
                     string titulo = docCN.ObtenerTituloDocumentoPorID(docID);
+                    titulo = UtilCadenas.ObtenerTextoDeIdioma(titulo, pIdioma, null);
                     if (!string.IsNullOrEmpty(titulo))
                     {
                         string query = $"SELECT DISTINCT ?s from <{UrlIntragnoss}{pGrafo}> WHERE {{ ?s ?p ?o. ?documento <http://gnoss/hasEntidad> ?s. FILTER (?documento = <{UrlIntragnoss}{docID}>)}}";
