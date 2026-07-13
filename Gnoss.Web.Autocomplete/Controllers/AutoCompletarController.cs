@@ -377,7 +377,7 @@ namespace Gnoss.Web.AutoComplete
                         }
                     }
 
-                    facetadoCL.ObtenerAutocompletar(grafo, facetadoDS, listaFiltros, listaFiltrosExtra, esMyGnoss, estaEnProyecto, esUsuarioInvitado, identidad, 0, 11 + listaTagsAñadidos.Count, formulariosSemanticos, filtrosContexto, mAvailableServices);
+                    facetadoCL.ObtenerAutocompletar(grafo, facetadoDS, listaFiltros, listaFiltrosExtra, esMyGnoss, estaEnProyecto, esUsuarioInvitado, identidad, 11 + listaTagsAñadidos.Count, formulariosSemanticos, filtrosContexto, mAvailableServices);
                     nombreFaceta = "Autocompletar";
                 }
                 else
@@ -422,7 +422,7 @@ namespace Gnoss.Web.AutoComplete
                     {*/
                     if (proyecto.ToLower() == "bab08a33-4041-4450-aef8-aafb6ea7d2a4") //DBLP
                     {
-                        facetadoCL.ObtenerFacetaSinOrdenDBLP(grafo, facetadoDS, nombreFaceta, listaFiltros, listaFiltrosExtra, esMyGnoss, estaEnProyecto, esUsuarioInvitado, identidad, TipoDisenio.ListaOrdCantidad, 0, 11, formulariosSemanticos, filtrosContexto, tipoProy, false, null, true, false, mAvailableServices);
+                        facetadoCL.ObtenerFacetaSinOrdenDBLP(grafo, facetadoDS, nombreFaceta, listaFiltros, listaFiltrosExtra, esMyGnoss, estaEnProyecto, esUsuarioInvitado, identidad, TipoDisenio.ListaOrdCantidad, 11, formulariosSemanticos, filtrosContexto, tipoProy, false, null, true, false, mAvailableServices);
                     }
                     else
                     {
@@ -440,11 +440,11 @@ namespace Gnoss.Web.AutoComplete
                         Guid pPestanyaID = new Guid();
                         if (Guid.TryParse(tipo, out pPestanyaID))
                         {
-                            facetadoCL.FacetadoCN.ObtenerFaceta(mProyectoID.ToString(), facetadoDS, nombreFaceta, listaFiltros, listaFiltrosExtra, esMyGnoss, estaEnProyecto, esUsuarioInvitado, identidad, TipoDisenio.ListaOrdCantidad, 0, 10, ListaItemsBusquedaExtra, true, false, false, pPestanyaID);
+                            facetadoCL.FacetadoCN.ObtenerFaceta(mProyectoID.ToString(), facetadoDS, nombreFaceta, listaFiltros, listaFiltrosExtra, esMyGnoss, estaEnProyecto, esUsuarioInvitado, identidad, TipoDisenio.ListaOrdCantidad, 10, ListaItemsBusquedaExtra, true, false, false, pPestanyaID);
                         }
                         else
                         {
-                            facetadoCL.FacetadoCN.ObtenerFaceta(mProyectoID.ToString(), facetadoDS, nombreFaceta, listaFiltros, listaFiltrosExtra, esMyGnoss, estaEnProyecto, esUsuarioInvitado, identidad, TipoDisenio.ListaOrdCantidad, 0, 10, ListaItemsBusquedaExtra, true, false);
+                            facetadoCL.FacetadoCN.ObtenerFaceta(mProyectoID.ToString(), facetadoDS, nombreFaceta, listaFiltros, listaFiltrosExtra, esMyGnoss, estaEnProyecto, esUsuarioInvitado, identidad, TipoDisenio.ListaOrdCantidad, 10, ListaItemsBusquedaExtra, true, false);
                         }
                     }
 
