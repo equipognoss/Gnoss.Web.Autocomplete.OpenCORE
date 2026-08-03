@@ -2567,7 +2567,7 @@ namespace Gnoss.Web.AutoComplete
             Dictionary<Guid, string> listaGruposBusqueda = new Dictionary<Guid, string>();
             if (traerDatos == 0 || traerDatos == 2)
             {
-                bool esSupervisorProyecto = proyectoCN.EsIdentidadAdministradorProyecto(new Guid(identidad), new Guid(proyecto), TipoRolUsuario.Supervisor);
+                bool esSupervisorProyecto = proyectoCN.EsIdentidadAdministradorProyecto(new Guid(identidad), new Guid(proyecto));
                 listaGruposBusqueda = identidadCN.ObtenerGruposParaAutocompletar(proyectoID, identidadID, busq, 30, esSupervisorProyecto);
             }
 
