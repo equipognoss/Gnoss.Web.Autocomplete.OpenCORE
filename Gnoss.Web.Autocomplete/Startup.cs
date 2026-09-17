@@ -7,6 +7,7 @@ using Es.Riam.Gnoss.AD.Virtuoso;
 using Es.Riam.Gnoss.CL;
 using Es.Riam.Gnoss.CL.RelatedVirtuoso;
 using Es.Riam.Gnoss.Elementos.ParametroAplicacion;
+using Es.Riam.Gnoss.HealthChecks;
 using Es.Riam.Gnoss.Recursos;
 using Es.Riam.Gnoss.Util.Configuracion;
 using Es.Riam.Gnoss.Util.General;
@@ -24,8 +25,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.OpenApi.Models;
-using Npgsql.EntityFrameworkCore.PostgreSQL.Infrastructure;
+using Microsoft.OpenApi;
 using ServicioAutoCompletarMVC;
 using System;
 using System.Collections;
@@ -68,13 +68,12 @@ namespace Gnoss.Web.AutoComplete
             services.AddControllers();
             services.AddHttpContextAccessor();
             services.AddMemoryCache();
-            services.AddScoped(typeof(UtilTelemetry));
             services.AddScoped(typeof(Usuario));
             services.AddScoped(typeof(UtilPeticion));
             services.AddScoped(typeof(Conexion));
             services.AddScoped(typeof(UtilGeneral));
             services.AddScoped(typeof(LoggingService));
-            services.AddScoped(typeof(RedisCacheWrapper));
+            services.AddSingleton(typeof(RedisCacheWrapper));
             services.AddScoped(typeof(Configuracion));
             services.AddScoped(typeof(GnossCache));
             services.AddScoped(typeof(VirtuosoAD));
@@ -136,11 +135,14 @@ namespace Gnoss.Web.AutoComplete
 
             CargarConfiguracionFacetado(loggingService, entity, configService);
 
-            ConfigurarApplicationInsights(configService);
-
 			UtilServicios.CargarDominiosPermitidosCORS(entity);
 
-			services.AddSwaggerGen(c =>
+            services.AddHealthChecks()
+                .AddGnossDatabaseHealthCheck<EntityContext>(bdType, configService.ObtenerSqlConnectionString())
+                .AddGnossRedisHealthCheck(configService.ObtenerConexionRedisIPMaster("redis"))
+                .AddGnossVirtuosoHealthCheck(configService.ObtenerVirtuosoConnectionString().ConnectionString);
+
+            services.AddSwaggerGen(c =>
             {
                 c.SwaggerDoc("v1", new OpenApiInfo { Title = "Gnoss.Web.AutoComplete", Version = "v1" });
             });
@@ -160,12 +162,14 @@ namespace Gnoss.Web.AutoComplete
 
             app.UseRouting();
 
-            app.UseCors();
+            app.UseCors("_myAllowSpecificOrigins");
 
             app.UseAuthorization();
             app.UseGnossMiddleware();
+            var managementPort = Configuration.GetValue("ManagementPort", 8081);
             app.UseEndpoints(endpoints =>
             {
+                endpoints.MapGnossHealthEndpoints(managementPort);
                 endpoints.MapControllers();
             });
         }
@@ -185,33 +189,6 @@ namespace Gnoss.Web.AutoComplete
             }
 
             BaseCL.DominioEstatico = dominio;
-        }
-
-
-        private void ConfigurarApplicationInsights(ConfigService configService)
-        {
-            string valor = configService.ObtenerImplementationKeyAutocompletar();
-
-            if (!string.IsNullOrEmpty(valor))
-            {
-                Microsoft.ApplicationInsights.Extensibility.TelemetryConfiguration.Active.InstrumentationKey = valor.ToLower();
-            }
-
-            if (UtilTelemetry.EstaConfiguradaTelemetria)
-            {
-
-                //Configuración de las trazas
-                string ubicacionTrazas = configService.ObtenerUbicacionTrazasAutocompletar();
-
-                int valorInt2 = 0;
-                if (int.TryParse(ubicacionTrazas, out valorInt2))
-                {
-                    if (Enum.IsDefined(typeof(UtilTelemetry.UbicacionLogsYTrazas), valorInt2))
-                    {
-                        LoggingService.UBICACIONTRAZA = (UtilTelemetry.UbicacionLogsYTrazas)valorInt2;
-                    }
-                }
-            }
         }
 
         private void CargarTextosPersonalizadosDominio(EntityContext context, LoggingService loggingService, ConfigService configService, RedisCacheWrapper redisCacheWrapper, ILoggerFactory mLoggerFactory)

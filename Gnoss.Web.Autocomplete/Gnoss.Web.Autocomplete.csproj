@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
 	<PropertyGroup>
-		<TargetFramework>net8.0</TargetFramework>
+		<TargetFramework>net10.0</TargetFramework>
 		<UserSecretsId>ddfbb2d9-28fe-4d4f-9aa2-9c1d41c75d9e</UserSecretsId>
 		<DockerDefaultTargetOS>Windows</DockerDefaultTargetOS>
 		<DockerfileContext>.</DockerfileContext>
@@ -9,10 +9,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="8.0.10" />
-		<PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.21.0" />
-		<PackageReference Include="Oracle.EntityFrameworkCore" Version="8.23.60" />
-		<PackageReference Include="Swashbuckle.AspNetCore" Version="6.9.0" />
+		<PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.7" />
 	</ItemGroup>
 
   <ItemGroup>
@@ -26,8 +23,10 @@
     <ProjectReference Include="..\..\Gnoss.Commons\Es.Riam.Gnoss.Util\Es.Riam.Gnoss.Util.csproj" />
     <ProjectReference Include="..\..\Gnoss.Commons\Es.Riam.Gnoss.Web.Controles\Es.Riam.Gnoss.Web.Controles.csproj" />
     <ProjectReference Include="..\..\Gnoss.Commons\Es.Riam.OpenReplication\Es.Riam.OpenReplication.csproj" />
+	  <ProjectReference Include="..\..\Gnoss.Commons\Es.Riam.InterfacesOpen\Es.Riam.InterfacesOpen.csproj" />
     <ProjectReference Include="..\..\Gnoss.Commons\Es.Riam.Open\Es.Riam.Open.csproj" />
     <ProjectReference Include="..\..\Gnoss.Commons\Es.Riam.Util\Es.Riam.Util.csproj" />
+	<ProjectReference Include="..\..\Gnoss.Commons\Es.Riam.Gnoss.HealthChecks\Es.Riam.Gnoss.HealthChecks.csproj" />
   </ItemGroup>
 
   <ProjectExtensions><VisualStudio><UserProperties appsettings_1json__JsonSchema="" /></VisualStudio></ProjectExtensions>

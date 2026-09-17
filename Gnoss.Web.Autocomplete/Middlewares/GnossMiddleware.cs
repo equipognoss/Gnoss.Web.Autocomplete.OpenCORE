@@ -1,6 +1,7 @@
 ﻿using Es.Riam.Gnoss.AD.EntityModel;
 using Es.Riam.Gnoss.Util.General;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Hosting;
 using System;
@@ -11,10 +12,10 @@ namespace ServicioAutoCompletarMVC
 {
     public class GnossMiddleware
     {
-        private IHostingEnvironment mEnv;
+        private readonly IWebHostEnvironment mEnv;
         private readonly RequestDelegate _next;
 
-        public GnossMiddleware(RequestDelegate next, IHostingEnvironment env)
+        public GnossMiddleware(RequestDelegate next, IWebHostEnvironment env)
         {
             _next = next;
             mEnv = env;
